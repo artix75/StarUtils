@@ -241,10 +241,12 @@ function ProgressBar(parent) {
 
 ProgressBar.prototype = new Label;
 
-function PreviewControl(parent)
+function PreviewControl(parent, opts)
 {
    this.__base__ = Frame;
    this.__base__(parent);
+
+   this.opts = opts;
 
    this.setImage = function(image, metadata) {
       this.image = image;
@@ -349,25 +351,31 @@ function PreviewControl(parent)
       this.parent.updateZoom(1);
    };
 
-   this.selectedItems_Button = new ToolButton(this);
-   this.selectedItems_Button.icon =
-      ':/icons/control-multiple-selection.png';
-   this.selectedItems_Button.setScaledFixedSize(20, 20);
-   this.selectedItems_Button.toolTip = 'Mark selected stars';
-   this.selectedItems_Button.onMousePress = function () {
-      var dialog = this.parent.parent;
-      if (dialog && dialog.previewMarkSelectedStars)
-         dialog.previewMarkSelectedStars();
+   var extraButtons = this.opts.extraButtons || {};
+   if (extraButtons.markSelectedItems) {
+      this.selectedItems_Button = new ToolButton(this);
+      this.selectedItems_Button.icon =
+         ':/icons/control-multiple-selection.png';
+      this.selectedItems_Button.setScaledFixedSize(20, 20);
+      this.selectedItems_Button.toolTip = 'Mark selected stars';
+      this.selectedItems_Button.onMousePress = function () {
+         var dialog = this.parent.parent;
+         if (dialog && dialog.previewMarkSelectedStars)
+            dialog.previewMarkSelectedStars();
+      }
    }
 
    this.buttons_Sizer = new HorizontalSizer;
    this.buttons_Sizer.add( this.zoomIn_Button );
    this.buttons_Sizer.add( this.zoomOut_Button );
    this.buttons_Sizer.add( this.zoom11_Button );
-   this.buttons_Sizer.add( this.selectedItems_Button );
+   if (extraButtons.markSelectedItems)
+      this.buttons_Sizer.add( this.selectedItems_Button );
    this.buttons_Sizer.addStretch();
 
-   this.setScaledMinSize(320,240);
+   var w = opts.minWidth || 320,
+       h = opts.minHeight || 240;
+   this.setScaledMinSize(w, h);
    this.zoom = 1;
    this.scale = 1;
    this.zoomOutLimit = -5;
@@ -553,6 +561,134 @@ function PreviewControl(parent)
 
 PreviewControl.prototype = new Frame;
 
+function StatsDialog(parent) {
+   this.__base__ = Dialog;
+   this.__base__(parent);
+   var me = this;
+
+   this.getFieldMaxWidth = function (stats) {
+      if (this.fieldMaxWidth !== undefined) return this.fieldMaxWidth;
+      var maxW = 0;
+      Object.keys(stats).forEach(field => {
+         var w = me.font.width(field + ': ');
+         if (w > maxW) maxW = w;
+      });
+      if (maxW === 0) maxW = me.font.width('MMMMMMMMMMM');
+      else this.fieldMaxWidth = maxW;
+      return maxW;
+   };
+
+   this.drawCharts = function () {
+      if (!this.starUtils) return;
+      var ungroupedChart = this.starUtils.ungroupedChart;
+      var groupedChart = this.starUtils.groupedChart;
+      if (!ungroupedChart) {
+         var res = this.starUtils.drawPlot('width', {
+            drawToWindow: false,
+            grouped: false,
+            drawPercentageLines: {'25%': true, '50%': true, '75%': true}
+         });
+         if (!res.created) {
+            parent.alert("Failed to create charts!");
+            return;
+         }
+         var imageFile = res.imageFile;
+         ungroupedChart = new Bitmap(imageFile);
+         this.starUtils.ungroupedChart = ungroupedChart;
+      }
+
+      this.ungroupedChartImage.setImage(ungroupedChart, {
+         width: ungroupedChart.width,
+         height: ungroupedChart.height
+      });
+
+      if (!groupedChart) {
+         res = this.starUtils.drawPlot('width', {
+            drawToWindow: false,
+            grouped: true,
+            drawPercentageLines: {'25%': true, '50%': true, '75%': true}
+         });
+         if (!res.created) {
+            parent.alert("Failed to create charts!");
+            return;
+         }
+         imageFile = res.imageFile;
+         groupedChart = new Bitmap(imageFile);
+         this.starUtils.groupedChart = groupedChart;
+      }
+
+      this.groupedChartImage.setImage(groupedChart, {
+         width: groupedChart.width,
+         height: groupedChart.height
+      });
+   }
+
+   this.updateStats = function () {
+      if (!this.starUtils) return;
+      var stats = this.starUtils.stats;
+      //console.noteln(JSON.stringify(stats, null, 4));
+      var sizer = this.statsBox.sizer;
+      ['width', 'flux'].forEach(function (quantity) {
+         var name = quantity.charAt(0).toUpperCase() + quantity.substr(1);
+         var dtlStats = stats[quantity];
+         var hdrsizer = new HorizontalSizer;//parent.createHorizontalSizer(me);
+         var header = new Label(me);
+         header.useRichText = true;
+         header.text = "<b>Star " + name + '</b>';
+         hdrsizer.add(header, 0, Align_Left);
+         sizer.add(hdrsizer);
+         Object.keys(dtlStats).forEach(field => {
+            var rowsizer = new HorizontalSizer;
+            var fieldLbl = new Label(me);
+            fieldLbl.text = field + ': ';
+            fieldLbl.setFixedWidth(me.getFieldMaxWidth(dtlStats));
+            fieldLbl.textAlignment = TextAlign_VertCenter | TextAlign_Right;
+            var valueLbl = new Label(me);
+            valueLbl.text = format('%.2f', dtlStats[field] || 0);
+            valueLbl.textAlignment = TextAlign_VertCenter;
+            rowsizer.add(fieldLbl);
+            rowsizer.add(valueLbl);
+            sizer.add(rowsizer);
+         });
+      });
+      this.statsBox.viewport.update();
+   };
+
+   this.starUtils = parent.starUtils;
+   this.sizer = parent.createHorizontalSizer(this);
+   this.leftSizer = parent.createVerticalSizer(this);
+   this.rightSizer = parent.createVerticalSizer(this);
+
+   var previewOpts = {minWidth: 320, minHeight: 266};
+   this.ungroupedChartImage = new PreviewControl(this, previewOpts);
+   this.ungroupedChartImage.setImage(null, {});
+   this.groupedChartImage = new PreviewControl(this, previewOpts);
+   this.groupedChartImage.setImage(null, {});
+   this.leftSizer.add(this.ungroupedChartImage);
+   this.leftSizer.add(this.groupedChartImage);
+
+   this.statsBox = new ScrollBox(this);
+   var par = parent;
+   with (this.statsBox) {
+      autoScroll = true;
+      sizer = par.createVerticalSizer(me);
+   }
+   this.rightSizer.add(this.statsBox);
+
+   this.sizer.add(this.leftSizer);
+   this.sizer.add(this.rightSizer);
+
+   this.onExecute = function () {
+      me.updateStats();
+      me.drawCharts();
+   };
+
+   this.windowTitle = "StarUtils Statistics";
+   this.adjustToContents();
+}
+
+StatsDialog.prototype = new Dialog;
+
 function StarUtilsDialog () {
 
    this.__base__ = Dialog;
@@ -597,6 +733,7 @@ function StarUtilsDialog () {
       }
       this.starUtils = null;
       this.starsDetected = false;
+      gc(true);
    }
 
    this.newStarUtils = function () {
@@ -700,6 +837,7 @@ function StarUtilsDialog () {
       if (!this.starUtils || !this.starsDetected) {
          this.analyzeButton.enabled = true;
          this.createMaskButton.enabled = false;
+         this.statsButton.enabled = false;
          this.fixButton.enabled = false;
          this.statusLabel.text = '---';
          this.progressLabel.text = '';
@@ -710,6 +848,7 @@ function StarUtilsDialog () {
          this.progressBar.updateProgress(0, 0);
       } else {
          this.analyzeButton.enabled = false;
+         this.statsButton.enabled = true;
          this.createMaskButton.enabled = true;
          var fixElongated = fixElongationBox.checked;
          var reduce = reduceStarsBox.checked;
@@ -718,6 +857,7 @@ function StarUtilsDialog () {
    };
 
    this.reset = function () {
+      this.enabled = false;
       this.deleteStarUtils();
       var optNames = Object.keys(this.optControls);
       optNames.forEach(name => {
@@ -731,6 +871,7 @@ function StarUtilsDialog () {
          }
       });
       //this.resetButton.enabled = false;
+      this.enabled = true;
       this.updateUI();
    };
 
@@ -954,6 +1095,23 @@ function StarUtilsDialog () {
       return element;
    };
 
+   this.getStatsDialog = function () {
+      var sd = this.starUtils;
+      if (!sd || !this.starsDetected) return null;
+      var dialog = this.statsDialog;
+      if (!dialog) {
+         dialog = this.statsDialog = new StatsDialog(this);
+      }
+      return dialog;
+   };
+
+   this.showStatsDialog = function () {
+      var dialog = this.getStatsDialog();
+      if (!dialog) return null;
+      dialog.execute();
+      return dialog;
+   };
+
    var labelW = this.font.width("Upper Peak Limit:");
    var editW = 12.0 * this.font.width('M');
    var smallNumericEditW = 5 * this.font.width('M');
@@ -1046,7 +1204,9 @@ function StarUtilsDialog () {
          }
       }
    }
-   this.previewControl = new PreviewControl(this);
+   this.previewControl = new PreviewControl(this, {
+      extraButtons: {markSelectedItems: true}
+   });
    this.previewControl.onCustomMouseClick = function (x, y, btn, state, mod) {
       console.writeln(format("Preview clicked at: %.1f, %.1f", x, y));
       if (me.starUtils && me.starUtils.stars) {
@@ -1141,11 +1301,19 @@ function StarUtilsDialog () {
    this.analyzeButton.onClick = function () {
       me.startAnalysis();
    };
+
    this.resetButton = new PushButton(this);
    this.resetButton.text = 'Reset';
    this.resetButton.icon = this.scaledResource(":/icons/reload.png");
    this.resetButton.onClick = function () {
       me.reset();
+   };
+
+   this.statsButton = new PushButton(this);
+   this.statsButton.text = 'Stats';
+   this.statsButton.icon = this.scaledResource(":/icons/chart.png");
+   this.statsButton.onClick = function () {
+      me.showStatsDialog();
    };
 
    this.createMaskButton = new PushButton(this);
@@ -1244,6 +1412,7 @@ function StarUtilsDialog () {
 
    this.actionSizer.add(this.analyzeButton);
    this.actionSizer.add(this.resetButton);
+   this.actionSizer.add(this.statsButton);
    this.actionSizer.add(this.createMaskButton);
    this.actionSizer.add(this.fixButton);
    this.actionSizer.add(this.closeButton);
