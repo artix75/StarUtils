@@ -121,8 +121,8 @@ var StarUtilsUI = {
          editEnabled: false,
          tip: 'Choose mask type.',
          items: [
-            'Undetected stars',
             'Selected stars',
+            'Undetected stars',
             'Custom',
          ]
       },
@@ -255,7 +255,7 @@ function PreviewControl(parent, opts)
       if (metadata && metadata.originalImage)
          this.srcImage = new Image(this.metadata.originalImage);
       this.setZoomOutLimit();
-      this.updateZoom(-100);
+      this.updateZoom(metadata.zoom || -100);
    }
 
    this.createImageWindow = function (windowId) {
@@ -792,20 +792,27 @@ function StarUtilsDialog () {
       });
    };
 
-   this.setPreviewImage = function (stars) {
+   this.getSelectedStars = function () {
+      return this.starListBox.selectedNodes.map(node => node.star);
+   };
+
+   this.setPreviewImage = function (stars, opts) {
       if (!this.starUtils) return;
+      opts = opts || {};
       stars = stars || [];
       var imageBmp = this.starUtils.createAnnotatedWindow(stars, {
          returnBitmap: true
       });
       this.dialog.previewControl.setImage(imageBmp, {
          width: imageBmp.width,
-         height: imageBmp.height
+         height: imageBmp.height,
+         zoom: opts.zoom
       });
    }
 
    this.previewZoomToStars = function (stars) {
       if (stars.length === 0) return;
+      if (!this.previewControl.image) return;
       var minTop = null, minLeft = null, maxRight = null, maxBottom = null;
       stars.forEach(star => {
          var rect = star.rect;
@@ -825,7 +832,7 @@ function StarUtilsDialog () {
    };
 
    this.previewMarkSelectedStars = function () {
-      var stars = me.starListBox.selectedNodes.map(node => node.star);
+      var stars = me.getSelectedStars();
       if (stars.length === 0) {
          me.alert('No star selected');
       }
@@ -891,6 +898,7 @@ function StarUtilsDialog () {
          this.populateStarList(sd.stars);
          this.starsDetected = (sd.stars.length > 0);
          this.updateUI();
+         this.setPreviewImage([]);
       } catch (e) {
          me.deleteStarUtils();
          this.analyzeButton.enabled = true;
@@ -1196,18 +1204,25 @@ function StarUtilsDialog () {
       setColumnWidth(2, this.font.width('MMMMMM'));
       setColumnWidth(3, this.font.width('MMMM'));
 
+      onNodeSelectionUpdated = function () {
+         var stars = me.getSelectedStars();
+         me.setPreviewImage(stars, {
+            zoom: zoom
+         });
+      }
+
       onNodeDoubleClicked = function (node) {
          var star = node.star;
          if (star) {
-            me.setPreviewImage([star]);
             me.previewZoomToStars([star]);
          }
       }
+
    }
    this.previewControl = new PreviewControl(this, {
       extraButtons: {markSelectedItems: true}
    });
-   this.previewControl.onCustomMouseClick = function (x, y, btn, state, mod) {
+   this.previewControl.onCustomMouseClick = function (x, y, state, mod) {
       console.writeln(format("Preview clicked at: %.1f, %.1f", x, y));
       if (me.starUtils && me.starUtils.stars) {
          var stars = me.starUtils.stars, i = 0, starAtPos = null;
@@ -1218,9 +1233,23 @@ function StarUtilsDialog () {
                break;
             }
          }
-         if (star) console.writeln("Star at point: " + star.id);
+         if (!starAtPos) return;
+         var star = starAtPos;
+         console.writeln("Star at point: " + starAtPos.id);
          if (star && star.node) {
-            me.starListBox.currentNode = star.node;
+            var do_add =
+               (mod === KeyModifier_Control || mod === KeyModifier_Meta);
+            if (!do_add) {
+               me.starListBox.selectedNodes.forEach(node => {
+                  node.selected = false;
+               });
+               if (star.node.selected) star.node.selected = false;
+               else me.starListBox.currentNode = star.node;
+               me.setPreviewImage(me.getSelectedStars());
+            } else {
+               star.node.selected = !star.node.selected;
+               me.setPreviewImage(me.getSelectedStars());
+            }
          }
       }
    };
@@ -1335,8 +1364,17 @@ function StarUtilsDialog () {
       var postprocess = binarize || dilation || convolution;
       var imageWin = null;
       if (maskTypeIdx === 0) {
+         /* Selected Stars */
+         var stars = me.getSelectedStars();
+         imageWin = sd.createStarMask(stars, {
+            binarize: binarize,
+            convolution: convolution,
+            dilation: dilation,
+         });
+         imageWin.bringToFront();
+      } else if (maskTypeIdx === 1) {
          /* Undetected stars */
-         imageWin = sd.displayUndetetctedStars({mono: true});
+         imageWin = sd.displayUndetectedStars({mono: true});
          view = imageWin.mainView;
          if (postprocess) view.beginProcess(UndoFlag_NoSwapFile);
          if (binarize) sd.binarize(view, 0.25);
@@ -1347,16 +1385,10 @@ function StarUtilsDialog () {
             sd.convolution(view, stdDev);
          }
          if (postprocess) view.endProcess();
-         //imageWin.bringToFront();
-      } else if (maskTypeIdx === 1) {
-         /* Selected Stars */
-         var stars = me.starListBox.selectedNodes.map(node => node.star);
-         imageWin = sd.createStarMask(stars, {
-            binarize: binarize,
-            convolution: convolution,
-            dilation: dilation,
-         });
          imageWin.bringToFront();
+      } else if (maskTypeIdx === 2) {
+         /* Custom Selection */
+
       }
    };
 

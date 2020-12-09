@@ -1310,7 +1310,7 @@ StarUtils.prototype = {
       awin.bringToFront();
       return awin;
    },
-   displayUndetetctedStars: function (opts) {
+   displayUndetectedStars: function (opts) {
       if (!this.stars) this.analyzeStars();
       opts = opts || {};
       var srcwin = opts.mono ? this.luminanceView.window : this.win;
