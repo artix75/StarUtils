@@ -1550,8 +1550,10 @@ StarUtils.prototype = {
          created: created};
    },
    closeTemporaryWindows: function () {
-      if (this.luminanceView.window && this.luminanceView.window !== this.win)
-         this.luminanceView.window.forceClose();
+      var lwin = this.luminanceView.window;
+      if (lwin && lwin !== this.win && !lwin.isNull && !lwin.isClosed) {
+            this.luminanceView.window.forceClose();
+      }
       this.temporaryWindows.forEach(window => {
          if (!window.isClosed) window.forceClose;
       });

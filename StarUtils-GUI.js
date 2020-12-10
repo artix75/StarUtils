@@ -241,12 +241,124 @@ function ProgressBar(parent) {
 
 ProgressBar.prototype = new Label;
 
-function PreviewControl(parent, opts)
-{
+function PreviewControl(parent, opts) {
    this.__base__ = Frame;
    this.__base__(parent);
+   var me = this;
 
    this.opts = opts;
+
+   this.style = opts.style || FrameStyle_Flat;
+   this.lineWidth = opts.lineWidth || 0;
+
+   var w = opts.minWidth || 320,
+       h = opts.minHeight || 240;
+   this.setScaledMinSize(w, h);
+   this.zoom = 1;
+   this.scale = 1;
+   this.zoomOutLimit = -5;
+
+   /* UI */
+   this.scrollbox = new ScrollBox(this);
+   this.scrollbox.autoScroll = true;
+   this.scrollbox.tracking = true;
+   this.scrollbox.cursor = new Cursor(StdCursor_Arrow);
+
+   this.scroll_Sizer = new HorizontalSizer;
+   this.scroll_Sizer.add(this.scrollbox);
+
+      this.zoomIn_Button = new ToolButton(this);
+   this.zoomIn_Button.icon = this.scaledResource( ":/icons/zoom-in.png" );
+   this.zoomIn_Button.setScaledFixedSize(20,20);
+   this.zoomIn_Button.toolTip = "Zoom in";
+   this.zoomIn_Button.onMousePress = function() {
+      this.parent.updateZoom(this.parent.zoom+1);
+   };
+
+   this.zoomOut_Button = new ToolButton(this);
+   this.zoomOut_Button.icon = this.scaledResource( ":/icons/zoom-out.png" );
+   this.zoomOut_Button.setScaledFixedSize(20, 20);
+   this.zoomOut_Button.toolTip = "Zoom in";
+   this.zoomOut_Button.onMousePress = function() {
+      this.parent.updateZoom(this.parent.zoom-1);
+   };
+
+   this.zoom11_Button = new ToolButton(this);
+   this.zoom11_Button.icon = this.scaledResource( ":/icons/zoom-1-1.png" );
+   this.zoom11_Button.setScaledFixedSize(20, 20);
+   this.zoom11_Button.toolTip = "Zoom 1:1";
+   this.zoom11_Button.onMousePress = function() {
+      this.parent.updateZoom(1);
+   };
+
+   var extraButtons = this.opts.extraButtons, buttonsToAdd = [];
+   if (extraButtons) {
+      extraButtons.forEach(btnDef => {
+         var btnType = btnDef.type || ToolButton;
+         var btn = new btnType(me);
+         if (btnDef.name) me[btnDef.name] = btn;
+         var icon = btnDef.icon;
+         if (icon) btn.icon = icon;
+         btn.setScaledFixedSize(20, 20);
+         if (btnDef.tooltip) btn.toolTip = btnDef.tooltip;
+         var onClick = btnDef.onClick;
+         if (onClick) btnDef.onMousePress = onClick;
+         buttonsToAdd.push(btn);
+      });
+   }
+
+   this.buttons_Sizer = new HorizontalSizer;
+   this.buttons_Sizer.add(this.zoomIn_Button);
+   this.buttons_Sizer.add(this.zoomOut_Button);
+   this.buttons_Sizer.add(this.zoom11_Button);
+   buttonsToAdd.forEach(btn => {me.buttons_Sizer.add(btn)});
+   this.buttons_Sizer.addStretch();
+
+      this.zoomLabel_Label = new Label(this);
+   this.zoomLabel_Label.text = "Zoom:";
+   this.zoomLabel_Label.textColor = 0xffffffff;
+   this.zoomVal_Label = new Label(this);
+   this.zoomVal_Label.text = "1:1";
+   this.zoomVal_Label.textColor = 0xffffffff;
+
+   this.Xlabel_Label = new Label(this);
+   this.Xlabel_Label.text = "X:";
+   this.Xlabel_Label.textColor = 0xffffffff;
+   this.Xval_Label = new Label(this);
+   this.Xval_Label.text = "---";
+   this.Xval_Label.textColor = 0xffffffff;
+   this.Ylabel_Label = new Label(this);
+   this.Ylabel_Label.text = "Y:";
+   this.Ylabel_Label.textColor = 0xffffffff;
+   this.Yval_Label = new Label(this);
+   this.Yval_Label.text = "---";
+   this.Yval_Label.textColor = 0xffffffff;
+
+   this.coords_Frame = new Frame(this);
+   this.coords_Frame.lineWidth = 0;
+   this.coords_Frame.style = FrameStyle_Flat;
+   this.coords_Frame.backgroundColor = 0xff666666;
+   this.coords_Frame.textColor = 0xffffffff;
+   this.coords_Frame.sizer = new HorizontalSizer;
+   this.coords_Frame.sizer.margin = 2;
+   this.coords_Frame.sizer.spacing = 4;
+   this.coords_Frame.sizer.add(this.zoomLabel_Label);
+   this.coords_Frame.sizer.add(this.zoomVal_Label);
+   this.coords_Frame.sizer.addSpacing(6);
+   this.coords_Frame.sizer.add(this.Xlabel_Label);
+   this.coords_Frame.sizer.add(this.Xval_Label);
+   this.coords_Frame.sizer.addSpacing(6);
+   this.coords_Frame.sizer.add(this.Ylabel_Label);
+   this.coords_Frame.sizer.add(this.Yval_Label);
+
+   this.coords_Frame.sizer.addStretch();
+
+   this.sizer = new VerticalSizer;
+   this.sizer.add(this.buttons_Sizer);
+   this.sizer.add(this.scroll_Sizer);
+   this.sizer.add(this.coords_Frame);
+
+   /* Methods */
 
    this.setImage = function(image, metadata) {
       this.image = image;
@@ -274,20 +386,19 @@ function PreviewControl(parent, opts)
 
    this.updateZoom = function (newZoom, refPoint) {
       newZoom = Math.max(this.zoomOutLimit, Math.min(2, newZoom));
-      if (newZoom == this.zoom && this.scaledImage)
-         return;
-
+      if (newZoom == this.zoom && this.scaledImage) return;
       if (!refPoint) {
+         /* Use central point as reference point */
          refPoint = new Point(this.scrollbox.viewport.width/2,
             this.scrollbox.viewport.height/2);
       }
-      var imgx = null;
+      var imgx = null, imgy = null;
       if (this.scrollbox.maxHorizontalScrollPosition > 0)
          imgx = (refPoint.x+this.scrollbox.horizontalScrollPosition)/this.scale;
-      var imgy = null;
       if (this.scrollbox.maxVerticalScrollPosition > 0)
          imgy = (refPoint.y+this.scrollbox.verticalScrollPosition)/this.scale;
 
+      /* Scale the image */
       this.zoom = newZoom;
       this.scaledImage = null;
       gc(true);
@@ -306,6 +417,8 @@ function PreviewControl(parent, opts)
             height:this.metadata.height * this.scale
          };
       }
+
+      /* Update scroll */
       this.scrollbox.maxHorizontalScrollPosition =
          Math.max(0, this.scaledImage.width - this.scrollbox.viewport.width);
       this.scrollbox.maxVerticalScrollPosition =
@@ -315,7 +428,6 @@ function PreviewControl(parent, opts)
          this.scrollbox.horizontalScrollPosition = (imgx*this.scale)-refPoint.x;
       if(this.scrollbox.maxVerticalScrollPosition > 0 && imgy != null)
          this.scrollbox.verticalScrollPosition = (imgy*this.scale)-refPoint.y;
-
       this.scrollbox.viewport.update();
    }
 
@@ -327,72 +439,34 @@ function PreviewControl(parent, opts)
       this.scrollbox.setScrollPosition(x, y);
    }
 
-   this.zoomIn_Button = new ToolButton(this);
-   this.zoomIn_Button.icon = this.scaledResource( ":/icons/zoom-in.png" );
-   this.zoomIn_Button.setScaledFixedSize(20,20);
-   this.zoomIn_Button.toolTip = "Zoom in";
-   this.zoomIn_Button.onMousePress = function() {
-      this.parent.updateZoom(this.parent.zoom+1);
-   };
-
-   this.zoomOut_Button = new ToolButton(this);
-   this.zoomOut_Button.icon = this.scaledResource( ":/icons/zoom-out.png" );
-   this.zoomOut_Button.setScaledFixedSize(20, 20);
-   this.zoomOut_Button.toolTip = "Zoom in";
-   this.zoomOut_Button.onMousePress = function() {
-      this.parent.updateZoom(this.parent.zoom-1);
-   };
-
-   this.zoom11_Button = new ToolButton(this);
-   this.zoom11_Button.icon = this.scaledResource( ":/icons/zoom-1-1.png" );
-   this.zoom11_Button.setScaledFixedSize(20, 20);
-   this.zoom11_Button.toolTip = "Zoom 1:1";
-   this.zoom11_Button.onMousePress = function() {
-      this.parent.updateZoom(1);
-   };
-
-   var extraButtons = this.opts.extraButtons || {};
-   if (extraButtons.markSelectedItems) {
-      this.selectedItems_Button = new ToolButton(this);
-      this.selectedItems_Button.icon =
-         ':/icons/control-multiple-selection.png';
-      this.selectedItems_Button.setScaledFixedSize(20, 20);
-      this.selectedItems_Button.toolTip = 'Mark selected stars';
-      this.selectedItems_Button.onMousePress = function () {
-         var dialog = this.parent.parent;
-         if (dialog && dialog.previewMarkSelectedStars)
-            dialog.previewMarkSelectedStars();
-      }
-   }
-
-   this.buttons_Sizer = new HorizontalSizer;
-   this.buttons_Sizer.add( this.zoomIn_Button );
-   this.buttons_Sizer.add( this.zoomOut_Button );
-   this.buttons_Sizer.add( this.zoom11_Button );
-   if (extraButtons.markSelectedItems)
-      this.buttons_Sizer.add( this.selectedItems_Button );
-   this.buttons_Sizer.addStretch();
-
-   var w = opts.minWidth || 320,
-       h = opts.minHeight || 240;
-   this.setScaledMinSize(w, h);
-   this.zoom = 1;
-   this.scale = 1;
-   this.zoomOutLimit = -5;
-   this.scrollbox = new ScrollBox(this);
-   this.scrollbox.autoScroll = true;
-   this.scrollbox.tracking = true;
-   this.scrollbox.cursor = new Cursor(StdCursor_Arrow);
-
-   this.scroll_Sizer = new HorizontalSizer;
-   this.scroll_Sizer.add( this.scrollbox );
-
    this.setZoomOutLimit = function() {
       var scaleX = Math.ceil(this.metadata.width/this.scrollbox.viewport.width);
       var scaleY = Math.ceil(this.metadata.height/this.scrollbox.viewport.height);
       var scale = Math.max(scaleX,scaleY);
       this.zoomOutLimit = -scale+2;
    }
+
+   this.transform = function(x, y, preview) {
+      if (!preview.scaledImage) return null;
+      var scrollbox = preview.scrollbox;
+      var ox = 0;
+      var oy = 0;
+      ox = scrollbox.maxHorizontalScrollPosition>0 ? -scrollbox.horizontalScrollPosition : (scrollbox.viewport.width-preview.scaledImage.width)/2;
+      oy = scrollbox.maxVerticalScrollPosition>0 ? -scrollbox.verticalScrollPosition: (scrollbox.viewport.height-preview.scaledImage.height)/2;
+      var coordPx = new Point((x - ox) / preview.scale, (y - oy) / preview.scale);
+      return new Point(coordPx.x, coordPx.y);
+   }
+
+   this.center = function() {
+      var preview = this;
+      var scrollbox = preview.scrollbox;
+      var x = scrollbox.viewport.width / 2;
+      var y = scrollbox.viewport.height / 2;
+      var p =  this.transform(x, y, preview);
+      return p;
+   }
+
+   /* Scrollbox event handlers */
 
    this.scrollbox.onHorizontalScrollPosUpdated = function (newPos) {
       this.viewport.update();
@@ -404,6 +478,8 @@ function PreviewControl(parent, opts)
    this.forceRedraw = function() {
       this.scrollbox.viewport.update();
    };
+
+   /* Event Handlers */
 
    this.scrollbox.viewport.onMouseWheel = function (x, y, delta, buttonState,
       modifiers)
@@ -417,7 +493,7 @@ function PreviewControl(parent, opts)
    {
       var preview = this.parent.parent;
       var p =  preview.transform(x, y, preview);
-      if (!p) return;
+      if (!p || isNaN(p.x) || isNaN(p.y)) return;
       this.mousePressedAt = p;
       if (preview.onCustomMouseDown) {
          preview.onCustomMouseDown.call(this, p.x, p.y, button, buttonState,
@@ -429,8 +505,8 @@ function PreviewControl(parent, opts)
       modifiers)
    {
       var preview = this.parent.parent;
-      if (p === undefined) return;
       var p =  preview.transform(x, y, preview);
+      if (!p || isNaN(p.x) || isNaN(p.y)) return;
       preview.Xval_Label.text = p.x.toString();
       preview.Yval_Label.text = p.y.toString();
 
@@ -446,7 +522,7 @@ function PreviewControl(parent, opts)
       var pressedAt = this.mousePressedAt;
       this.mousePressedAt = null;
       var p =  preview.transform(x, y, preview);
-      if (!p) return;
+      if (!p || isNaN(p.x) || isNaN(p.y)) return;
       if (preview.onCustomMouseUp) {
          preview.onCustomMouseUp.call(this, p.x, p.y, button, buttonState,
             modifiers);
@@ -475,8 +551,9 @@ function PreviewControl(parent, opts)
       this.update();
    }
 
-   this.scrollbox.viewport.onPaint = function (x0, y0, x1, y1)
-   {
+   /* Rendering */
+
+   this.scrollbox.viewport.onPaint = function (x0, y0, x1, y1) {
       var preview = this.parent.parent;
       if (!preview.scaledImage) return;
       var graphics = new VectorGraphics(this);
@@ -503,60 +580,6 @@ function PreviewControl(parent, opts)
       graphics.end();
    }
 
-   this.transform = function(x, y, preview) {
-      if (!preview.scaledImage) return null;
-      var scrollbox = preview.scrollbox;
-      var ox = 0;
-      var oy = 0;
-      ox = scrollbox.maxHorizontalScrollPosition>0 ? -scrollbox.horizontalScrollPosition : (scrollbox.viewport.width-preview.scaledImage.width)/2;
-      oy = scrollbox.maxVerticalScrollPosition>0 ? -scrollbox.verticalScrollPosition: (scrollbox.viewport.height-preview.scaledImage.height)/2;
-      var coordPx = new Point((x - ox) / preview.scale, (y - oy) / preview.scale);
-      return new Point(coordPx.x, coordPx.y);
-   }
-
-   this.center = function() {
-      var preview = this;
-      var scrollbox = preview.scrollbox;
-      var x = scrollbox.viewport.width / 2;
-      var y = scrollbox.viewport.height / 2;
-      var p =  this.transform(x, y, preview);
-      return p;
-   }
-
-   this.zoomLabel_Label = new Label(this);
-   this.zoomLabel_Label.text = "Zoom:";
-   this.zoomVal_Label = new Label(this);
-   this.zoomVal_Label.text = "1:1";
-
-   this.Xlabel_Label = new Label(this);
-   this.Xlabel_Label.text = "X:";
-   this.Xval_Label = new Label(this);
-   this.Xval_Label.text = "---";
-   this.Ylabel_Label = new Label(this);
-   this.Ylabel_Label.text = "Y:";
-   this.Yval_Label = new Label(this);
-   this.Yval_Label.text = "---";
-
-   this.coords_Frame = new Frame(this);
-   this.coords_Frame.backgroundColor = 0xffffffff;
-   this.coords_Frame.sizer = new HorizontalSizer;
-   this.coords_Frame.sizer.margin = 2;
-   this.coords_Frame.sizer.spacing = 4;
-   this.coords_Frame.sizer.add(this.zoomLabel_Label);
-   this.coords_Frame.sizer.add(this.zoomVal_Label);
-   this.coords_Frame.sizer.addSpacing(6);
-   this.coords_Frame.sizer.add(this.Xlabel_Label);
-   this.coords_Frame.sizer.add(this.Xval_Label);
-   this.coords_Frame.sizer.addSpacing(6);
-   this.coords_Frame.sizer.add(this.Ylabel_Label);
-   this.coords_Frame.sizer.add(this.Yval_Label);
-
-   this.coords_Frame.sizer.addStretch();
-
-   this.sizer = new VerticalSizer;
-   this.sizer.add(this.buttons_Sizer);
-   this.sizer.add(this.scroll_Sizer);
-   this.sizer.add(this.coords_Frame);
 }
 
 PreviewControl.prototype = new Frame;
@@ -730,6 +753,7 @@ function StarUtilsDialog () {
    this.deleteStarUtils = function () {
       if (this.starUtils) {
          this.starUtils.closeTemporaryWindows();
+         this.bitmaps = null;
       }
       this.starUtils = null;
       this.starsDetected = false;
@@ -796,18 +820,41 @@ function StarUtilsDialog () {
       return this.starListBox.selectedNodes.map(node => node.star);
    };
 
+   this.getBitmapID = function (stars) {
+      stars = stars || [];
+      return stars.map(s => s.id).sort().join();
+   }
+
    this.setPreviewImage = function (stars, opts) {
       if (!this.starUtils) return;
       opts = opts || {};
       stars = stars || [];
-      var imageBmp = this.starUtils.createAnnotatedWindow(stars, {
-         returnBitmap: true
-      });
+      var bmpID = this.getBitmapID(stars);
+      if (bmpID === this.previewBitmapID) return;
+      this.settingPreviewBitmapWithID = bmpID;
+      this.bitmaps = this.bitmaps || {}; /* Bitmaps cache */
+      var imageBmp = this.bitmaps[bmpID];
+      if (!imageBmp) {
+         imageBmp = this.starUtils.createAnnotatedWindow(stars, {
+            returnBitmap: true
+         });
+         this.bitmaps[bmpID] = imageBmp;
+      }
+      var zoom = opts.zoom, scroll = opts.scroll;
+      if (this.zoomPreviewToStar && this.zoomPreviewToStar.id === bmpID) {
+         zoom = zoom || this.zoomPreviewToStar.zoom;
+         scroll = this.zoomPreviewToStar.scroll;
+      }
       this.dialog.previewControl.setImage(imageBmp, {
          width: imageBmp.width,
          height: imageBmp.height,
-         zoom: opts.zoom
+         zoom: zoom
       });
+      if (scroll && !isNaN(scroll.x) && !isNaN(scroll.y))
+         this.previewControl.scrollTo(scroll.x, scroll.y);
+      this.settingPreviewBitmapWithID = null;
+      this.previewBitmapID = bmpID;
+      this.zoomPreviewToStar = null;
    }
 
    this.previewZoomToStars = function (stars) {
@@ -827,6 +874,17 @@ function StarUtilsDialog () {
       var center = rect.center;
       console.writeln(format("Centering preview on stars at: %.1f, %.1f",
          center.x, center.y));
+      if (stars.length === 1) {
+         var star = stars[0];
+         if (star.id === this.settingPreviewBitmapWithID) {
+            this.zoomPreviewToStar = {id: star.id, zoom: r, scroll: {
+                  x: center.x,
+                  y: center.y,
+               }
+            };
+            return;
+         }
+      }
       me.previewControl.updateZoom(r);
       me.previewControl.scrollTo(center.x, center.y);
    };
@@ -1207,7 +1265,7 @@ function StarUtilsDialog () {
       onNodeSelectionUpdated = function () {
          var stars = me.getSelectedStars();
          me.setPreviewImage(stars, {
-            zoom: zoom
+            zoom: null
          });
       }
 
@@ -1220,7 +1278,7 @@ function StarUtilsDialog () {
 
    }
    this.previewControl = new PreviewControl(this, {
-      extraButtons: {markSelectedItems: true}
+      extraButtons: []
    });
    this.previewControl.onCustomMouseClick = function (x, y, state, mod) {
       console.writeln(format("Preview clicked at: %.1f, %.1f", x, y));
