@@ -742,10 +742,12 @@ function StatsDialog(parent) {
 
 StatsDialog.prototype = new Dialog;
 
-function StarUtilsDialog () {
+function StarUtilsDialog (options) {
 
    this.__base__ = Dialog;
    this.__base__();
+   this.options = options || {};
+
    this.starUtils = null;
    this.optControls = {};
    this.status = null;
@@ -951,6 +953,7 @@ function StarUtilsDialog () {
    };
 
    this.updateUI = function () {
+      var collapsablePanels = this.options.collapsablePanels !== false;
       if (!this.starUtils || !this.starsDetected) {
          this.analyzeButton.enabled = true;
          this.createMaskButton.enabled = false;
@@ -963,6 +966,11 @@ function StarUtilsDialog () {
          this.starListBox.clear();
          this.previewControl.setImage(null, {});
          this.progressBar.updateProgress(0, 0);
+         if (collapsablePanels) {
+            this.leftPanel.show();
+            this.centerPanel.hide();
+            this.rightPanel.hide();
+         }
       } else {
          this.analyzeButton.enabled = false;
          this.statsButton.enabled = true;
@@ -970,7 +978,13 @@ function StarUtilsDialog () {
          var fixElongated = fixElongationBox.checked;
          var reduce = reduceStarsBox.checked;
          this.fixButton.enabled = (fixElongated || reduce);
+         if (collapsablePanels) {
+            this.leftPanel.hide();
+            this.centerPanel.show();
+            this.rightPanel.show();
+         }
       }
+      this.adjustToContents();
    };
 
    this.reset = function () {
@@ -1246,11 +1260,20 @@ function StarUtilsDialog () {
    var numericEditW = 14 * this.font.width('M');
    var oneCharW = 1 * this.font.width('M');
 
+   /* UI building */
+
    this.sizer = this.createVerticalSizer();
    this.mainSizer = this.createHorizontalSizer();
    this.leftSizer = this.createVerticalSizer();
    this.centerSizer = this.createVerticalSizer();
    this.rightSizer = this.createVerticalSizer();
+
+   this.leftPanel = new Frame(this);
+   this.centerPanel = new Frame(this);
+   this.rightPanel = new Frame(this);
+   this.leftPanel.sizer = this.leftSizer;
+   this.centerPanel.sizer = this.centerSizer;
+   this.rightPanel.sizer = this.rightSizer;
 
    /* View list */
    var viewListSizer = this.createHorizontalSizer();
@@ -1298,7 +1321,6 @@ function StarUtilsDialog () {
    this.psfSection = new SectionBar(this, 'PSF');
    this.psfSection.setSection(PSFBox);
 
-   this.leftSizer.add(viewListSizer, 1);
    this.leftSizer.add(this.starDetectorSection, 1);
    this.leftSizer.add(this.starDetectorBox, 1);
    this.leftSizer.add(this.psfSection, 1);
@@ -1613,9 +1635,10 @@ function StarUtilsDialog () {
       }
    });
 
-   this.mainSizer.add(this.leftSizer);
-   this.mainSizer.add(this.centerSizer);
-   this.mainSizer.add(this.rightSizer);
+   this.mainSizer.add(this.leftPanel);
+   this.mainSizer.add(this.centerPanel);
+   this.mainSizer.add(this.rightPanel);
+   this.sizer.add(viewListSizer, 0);
    this.sizer.add(this.mainSizer);
    this.sizer.add(this.progressBar);
    this.sizer.add(this.statusSizer);
