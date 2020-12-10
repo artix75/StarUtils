@@ -203,20 +203,25 @@ var StarUtilsUI = {
    ]
 };
 
-function ProgressBar(parent) {
+function ProgressBar(parent, opts) {
 
    this.__base__ = Label;
    this.__base__(parent);
+   var me = this;
+   opts = opts || {};
 
-   this.backgroundColor = 0xFFF0F0F0;
+   this.backgroundColor = opts.backgroundColor || 0xFFF0F0F0;
    this.scaledMinHeight = 12;
    this.textAlignment = TextAlign_HorzCenter | TextAlign_VertCenter;
 
    this.progress = 0;
    this.total = 100;
 
-   this.backColor = 0xFFFFFFFF;
-   this.progressColor = 0xFF00FF00;
+   this.trackColor = opts.trackColor || 0xFFFFFFFF;
+   this.progressColor = opts.progressColor || 0xFF00FF00;
+   this.getProgressText = opts.getProgressText || function (_cur,_tot,_perc) {
+      return format('%d/%d (%d%%)', _cur,_tot,_perc);
+   };
 
    this.onPaint = function() {
       var i = this.progress || 0;
@@ -225,7 +230,7 @@ function ProgressBar(parent) {
       var text = '';
       if (this.displayText !== false && this.total) {
          var percentTxt = Math.round(progressPercent * 100);
-         text = format('%d/%d (%d%%)', i, this.total, percentTxt);
+         text = me.getProgressText(i, this.total, percentTxt);
       }
       this.text = text;
       var g = new Graphics();
@@ -236,7 +241,7 @@ function ProgressBar(parent) {
          g.clipRect = new Rect(0, 0, this.width, this.height);
          g.fillRect(g.clipRect, clear);
       } else {
-         var clear = new Brush(this.backColor);
+         var clear = new Brush(this.trackColor);
          var r = new Rect(0, 0, parent.width - this.position.x * 2,
             this.height);
          g.clipRect = r;
@@ -668,7 +673,7 @@ function StatsDialog(parent) {
       if (!this.starUtils) return;
       var stats = this.starUtils.stats;
       //console.noteln(JSON.stringify(stats, null, 4));
-      var sizer = this.statsBox.sizer;
+      var sizer = this.statsBox.viewport.sizer;
       ['width', 'flux'].forEach(function (quantity) {
          var name = quantity.charAt(0).toUpperCase() + quantity.substr(1);
          var dtlStats = stats[quantity];
@@ -713,6 +718,7 @@ function StatsDialog(parent) {
    with (this.statsBox) {
       autoScroll = true;
       sizer = par.createVerticalSizer(me);
+      viewport.sizer = par.createVerticalSizer(me);
    }
    this.rightSizer.add(this.statsBox);
 
@@ -1525,9 +1531,13 @@ function StarUtilsDialog () {
    this.actionSizer.add(this.fixButton);
    this.actionSizer.add(this.closeButton);
 
-   this.progressBar = new ProgressBar(this);
-   this.progressBar.backColor = 0x5AFFFFFF;
-   this.progressBar.progressColor = 0xFF7DA6AB;
+   this.progressBar = new ProgressBar(this, {
+      trackColor: 0x5AAAAAAA,
+      progressColor: 0xFF7DA6AB,
+      getProgressText: function (cur, tot, percentage) {
+         return percentage + '%';
+      }
+   });
 
    this.mainSizer.add(this.leftSizer);
    this.mainSizer.add(this.centerSizer);
