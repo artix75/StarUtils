@@ -952,8 +952,10 @@ function StarUtilsDialog (options) {
       me.previewZoomToStars(stars);
    };
 
-   this.updateUI = function () {
-      var collapsablePanels = this.options.collapsablePanels !== false;
+   this.updateUI = function (opts) {
+      opts = opts || {};
+      var collapsablePanels = this.options.collapsablePanels !== false &&
+                              opts.collapsePanels !== false;
       if (!this.starUtils || !this.starsDetected) {
          this.analyzeButton.enabled = true;
          this.createMaskButton.enabled = false;
@@ -987,9 +989,13 @@ function StarUtilsDialog (options) {
       this.adjustToContents();
    };
 
-   this.reset = function () {
+   this.reset = function (opts) {
+      opts = opts || {};
       this.enabled = false;
       this.deleteStarUtils();
+      this.settingPreviewBitmapWithID = null;
+      this.previewBitmapID = null;
+      this.zoomPreviewToStar = null;
       var optNames = Object.keys(this.optControls);
       optNames.forEach(name => {
          var control = me.optControls[name];
@@ -1003,7 +1009,7 @@ function StarUtilsDialog (options) {
       });
       //this.resetButton.enabled = false;
       this.enabled = true;
-      this.updateUI();
+      this.updateUI({collapsePanels: opts.collapsePanels !== false});
       with (this.previewControl.toggleDetectedStarsBtn) {
          checked = false;
          enabled = false;
@@ -1252,6 +1258,47 @@ function StarUtilsDialog (options) {
       if (!dialog) return null;
       dialog.execute();
       return dialog;
+   };
+
+   this.fixStars = function () {
+      var sd = me.starUtils;
+      if (!sd || !me.starsDetected) {
+         alert("No stars detected");
+         return;
+      }
+      var doFixElongation = me.fixElongationBox.checked;
+      var doReduce = me.reduceStarsBox.checked;
+      if (!doFixElongation && !doReduce) {
+         alert("Both 'Fix Elongated Stars' && 'Reduce Stars' are disabled");
+         return;
+      }
+      me.enabled = false;
+      try {
+         if (doFixElongation) {
+            var threshold = me.fixElongatedStarsThreshold.value;
+            var keepMask = me.fixElongatedStarsKeepMasks.checked;
+            console.noteln(threshold);
+            var fixOpts = {
+               threshold: threshold,
+               keepMask: keepMask
+            };
+            sd.fixElongatedStars(fixOpts);
+         }
+         me.progressBar.updateProgress(0, 0);
+         if (doReduce) {
+            var selection = me.reduceStarsSelection.value;
+            sd.reduceStars(null, null, {selection: selection});
+         }
+         me.reset({collapsePanels: false});
+         me.startAnalysis();
+      } catch (e) {
+         me.deleteStarUtils();
+         me.analyzeButton.enabled = true;
+         me.alert("Execution error");
+         me.cancel();
+         throw e;
+      }
+      me.enabled = true;
    };
 
    var labelW = this.font.width("Upper Peak Limit:");
@@ -1574,42 +1621,7 @@ function StarUtilsDialog (options) {
    this.fixButton.text = 'Fix Stars';
    this.fixButton.icon = this.scaledResource(":/icons/process.png");
    this.fixButton.onClick = function () {
-      var sd = me.starUtils;
-      if (!sd || !me.starsDetected) {
-         alert("No stars detected");
-         return;
-      }
-      var doFixElongation = me.fixElongationBox.checked;
-      var doReduce = me.reduceStarsBox.checked;
-      if (!doFixElongation && !doReduce) {
-         alert("Both 'Fix Elongated Stars' && 'Reduce Stars' are disabled");
-         return;
-      }
-      me.enabled = false;
-      try {
-         if (doFixElongation) {
-            var threshold = me.fixElongatedStarsThreshold.value;
-            var keepMask = me.fixElongatedStarsKeepMasks.checked;
-            console.noteln(threshold);
-            var fixOpts = {
-               threshold: threshold,
-               keepMask: keepMask
-            };
-            sd.fixElongatedStars(fixOpts);
-         }
-         me.progressBar.updateProgress(0, 0);
-         if (doReduce) {
-            var selection = me.reduceStarsSelection.value;
-            sd.reduceStars(null, null, {selection: selection});
-         }
-      } catch (e) {
-         me.deleteStarUtils();
-         me.analyzeButton.enabled = true;
-         me.alert("Execution error");
-         me.cancel();
-         throw e;
-      }
-      me.enabled = true;
+      me.fixStars();
    };
 
    this.closeButton = new PushButton(this);
