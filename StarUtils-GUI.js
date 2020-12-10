@@ -1476,7 +1476,7 @@ function StarUtilsDialog (options) {
       if (me.starUtils && me.starUtils.stars) {
          var star = me.getStarAtPosition(x, y);
          if (!star) return;
-         console.writeln("Star at point: " + starAtPos.id);
+         console.writeln("Star at point: " + star.id);
          if (star.node) {
             var do_add =
                (mod === KeyModifier_Control || mod === KeyModifier_Meta);
