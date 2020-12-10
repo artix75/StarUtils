@@ -567,6 +567,18 @@ function PreviewControl(parent, opts) {
       }
    }
 
+   this.scrollbox.viewport.onMouseDoubleClick = function (x, y, button, state,
+      modifiers)
+   {
+      var preview = this.parent.parent;
+      var p =  preview.transform(x, y, preview);
+      if (!p || isNaN(p.x) || isNaN(p.y)) return;
+      if (preview.onCustomMouseDoubleClick) {
+         preview.onCustomMouseDoubleClick.call(this, p.x, p.y, button, state,
+            modifiers);
+      }
+   }
+
    this.scrollbox.viewport.onResize = function (wNew, hNew, wOld, hOld) {
       var preview = this.parent.parent;
       if (preview.metadata && preview.scaledImage) {
@@ -951,6 +963,19 @@ function StarUtilsDialog (options) {
       me.setPreviewImage(stars);
       me.previewZoomToStars(stars);
    };
+
+   this.getStarAtPosition = function (x, y) {
+      if (!this.starUtils) return null;
+      var stars = this.starUtils.stars, i = 0, starAtPos = null;
+      for (i = 0; i < stars.length; i++) {
+         var star = stars[i];
+         if (star.rect && star.rect.includes(x, y)) {
+            starAtPos = star;
+            break;
+         }
+      }
+      return starAtPos;
+   }
 
    this.updateUI = function (opts) {
       opts = opts || {};
@@ -1449,18 +1474,10 @@ function StarUtilsDialog (options) {
    this.previewControl.onCustomMouseClick = function (x, y, state, mod) {
       console.writeln(format("Preview clicked at: %.1f, %.1f", x, y));
       if (me.starUtils && me.starUtils.stars) {
-         var stars = me.starUtils.stars, i = 0, starAtPos = null;
-         for (i = 0; i < stars.length; i++) {
-            var star = stars[i];
-            if (star.rect && star.rect.includes(x, y)) {
-               starAtPos = star;
-               break;
-            }
-         }
-         if (!starAtPos) return;
-         var star = starAtPos;
+         var star = me.getStarAtPosition(x, y);
+         if (!star) return;
          console.writeln("Star at point: " + starAtPos.id);
-         if (star && star.node) {
+         if (star.node) {
             var do_add =
                (mod === KeyModifier_Control || mod === KeyModifier_Meta);
             var zoom = me.previewControl.zoom || -100;
@@ -1476,6 +1493,18 @@ function StarUtilsDialog (options) {
                me.setPreviewImage(me.getSelectedStars(), {zoom: zoom});
             }
          }
+      }
+   };
+   this.previewControl.onCustomMouseDoubleClick = function (x, y, state, mod) {
+      var star = me.getStarAtPosition(x, y);
+      if (!star) return;
+      if (star.node) {
+         me.starListBox.selectedNodes.forEach(node => {
+            node.selected = false;
+         });
+         me.starListBox.currentNode = star.node;
+         me.setPreviewImage(me.getSelectedStars());
+         me.previewZoomToStars([star]);
       }
    };
    this.previewControl.setImage(null, {});
