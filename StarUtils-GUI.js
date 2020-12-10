@@ -290,7 +290,7 @@ function PreviewControl(parent, opts) {
    this.scroll_Sizer = new HorizontalSizer;
    this.scroll_Sizer.add(this.scrollbox);
 
-      this.zoomIn_Button = new ToolButton(this);
+   this.zoomIn_Button = new ToolButton(this);
    this.zoomIn_Button.icon = this.scaledResource( ":/icons/zoom-in.png" );
    this.zoomIn_Button.setScaledFixedSize(20,20);
    this.zoomIn_Button.toolTip = "Zoom in";
@@ -324,8 +324,14 @@ function PreviewControl(parent, opts) {
          if (icon) btn.icon = icon;
          btn.setScaledFixedSize(20, 20);
          if (btnDef.tooltip) btn.toolTip = btnDef.tooltip;
-         var onClick = btnDef.onClick;
-         if (onClick) btnDef.onMousePress = onClick;
+         var onClick = btnDef.onClick, onCheck = btnDef.onCheck;
+         if (onClick) btn.onClick = onClick;
+         if (onCheck) btn.onCheck = onCheck;
+         if (btnDef.checkable) {
+            btn.checkable = true;
+            btn.checked = btnDef.checked === true;
+         }
+         btn.enabled = btnDef.enabled !== false;
          buttonsToAdd.push(btn);
       });
    }
@@ -849,17 +855,36 @@ function StarUtilsDialog () {
       return stars.map(s => s.id).sort().join();
    }
 
+   this.previewSetImageWithNoMarks = function (opts) {
+      opts = opts || {};
+      this.setPreviewImage([], {
+         bitmapID: 'noMarks',
+         zoom: opts.zoom
+      });
+   };
+
+   this.previewDisplayDetectedStars = function (opts) {
+      opts = opts || {};
+      if (!this.starUtils || !this.starsDetected) return;
+      this.setPreviewImage(this.starUtils.stars, {
+         color: 0xaa0099bb,
+         bitmapID: 'detectedStars',
+         zoom: opts.zoom
+      });
+   };
+
    this.setPreviewImage = function (stars, opts) {
       if (!this.starUtils) return;
       opts = opts || {};
       stars = stars || [];
-      var bmpID = this.getBitmapID(stars);
+      var bmpID = opts.bitmapID || this.getBitmapID(stars);
       if (bmpID === this.previewBitmapID) return;
       this.settingPreviewBitmapWithID = bmpID;
       this.bitmaps = this.bitmaps || {}; /* Bitmaps cache */
       var imageBmp = this.bitmaps[bmpID];
       if (!imageBmp) {
          imageBmp = this.starUtils.createAnnotatedWindow(stars, {
+            color: opts.color,
             returnBitmap: true
          });
          this.bitmaps[bmpID] = imageBmp;
@@ -879,6 +904,9 @@ function StarUtilsDialog () {
       this.settingPreviewBitmapWithID = null;
       this.previewBitmapID = bmpID;
       this.zoomPreviewToStar = null;
+      var toggleBtn = this.previewControl.toggleDetectedStarsBtn;
+      if (toggleBtn && bmpID !== 'detectedStars' && toggleBtn.checked)
+         toggleBtn.checked = false;
    }
 
    this.previewZoomToStars = function (stars) {
@@ -962,6 +990,11 @@ function StarUtilsDialog () {
       //this.resetButton.enabled = false;
       this.enabled = true;
       this.updateUI();
+      with (this.previewControl.toggleDetectedStarsBtn) {
+         checked = false;
+         enabled = false;
+      }
+      this.previewControl.clearSelectedStarsBtn.enabled = false;
    };
 
    this.startAnalysis = function () {
@@ -980,7 +1013,12 @@ function StarUtilsDialog () {
          this.populateStarList(sd.stars);
          this.starsDetected = (sd.stars.length > 0);
          this.updateUI();
-         this.setPreviewImage([]);
+         this.previewDisplayDetectedStars();
+         with (this.previewControl.toggleDetectedStarsBtn) {
+            checked = true;
+            enabled = true;
+         }
+         this.previewControl.clearSelectedStarsBtn.enabled = true;
       } catch (e) {
          me.deleteStarUtils();
          this.analyzeButton.enabled = true;
@@ -1302,7 +1340,42 @@ function StarUtilsDialog () {
 
    }
    this.previewControl = new PreviewControl(this, {
-      extraButtons: []
+      extraButtons: [
+         {
+            name: 'toggleDetectedStarsBtn',
+            icon: ':/icons/favorite-ok.png',
+            checkable: true,
+            checked: false,
+            enabled: false,
+            tooltip: 'Display detected stars',
+            onCheck: function () {
+               var zoom = me.previewControl.zoom || -100;
+               if (this.checked) {
+                  var bmpID = me.previewBitmapID;
+                  if (bmpID === 'detectedStars') return;
+                  if (bmpID) this.oldPreviewBitmapID = bmpID;
+                  me.previewDisplayDetectedStars({zoom: zoom});
+               } else {
+                  var bmpID = this.oldPreviewBitmapID;
+                  if (!bmpID) me.previewSetImageWithNoMarks({zoom: zoom});
+                  else me.setPreviewImage(null, {bitmapID: bmpID, zoom: zoom});
+               }
+            }
+         },
+         {
+            name: 'clearSelectedStarsBtn',
+            icon: ':/icons/delete.png',
+            tooltip: 'Clear selected stars',
+            enabled: false,
+            onClick: function () {
+               var zoom = me.previewControl.zoom || -100;
+               me.starListBox.selectedNodes.forEach(node => {
+                  node.selected = false;
+               });
+               me.previewSetImageWithNoMarks({zoom: zoom});
+            }
+         }
+      ]
    });
    this.previewControl.onCustomMouseClick = function (x, y, state, mod) {
       console.writeln(format("Preview clicked at: %.1f, %.1f", x, y));
@@ -1321,16 +1394,17 @@ function StarUtilsDialog () {
          if (star && star.node) {
             var do_add =
                (mod === KeyModifier_Control || mod === KeyModifier_Meta);
+            var zoom = me.previewControl.zoom || -100;
             if (!do_add) {
                me.starListBox.selectedNodes.forEach(node => {
                   node.selected = false;
                });
                if (star.node.selected) star.node.selected = false;
                else me.starListBox.currentNode = star.node;
-               me.setPreviewImage(me.getSelectedStars());
+               me.setPreviewImage(me.getSelectedStars(), {zoom: zoom});
             } else {
                star.node.selected = !star.node.selected;
-               me.setPreviewImage(me.getSelectedStars());
+               me.setPreviewImage(me.getSelectedStars(), {zoom: zoom});
             }
          }
       }
