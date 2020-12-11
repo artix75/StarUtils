@@ -850,10 +850,13 @@ function StarUtilsDialog (options) {
          node.setText(0, star.id);
          node.setText(1, format('%.2f', star.width));
          node.setText(2, format('%.2f', star.flux));
-         if (star.psf)
+         if (star.psf){
             node.setText(3, format('%.2f', star.psf.aspectRatio));
-         else
+            node.setText(4, format('%.2f', star.psf.angle));
+         } else {
             node.setText(3,'---');
+            node.setText(4,'---');
+         }
          node.star = star;
          star.node = node;
          listBox.add(node);
@@ -1406,17 +1409,19 @@ function StarUtilsDialog (options) {
       //headerVisible = false;
       rootDecoration = true;
       headerSorting = true;
-      numberOfColumns = 4;
+      numberOfColumns = 5;
       multipleSelection = true;
       setHeaderText(0, 'ID');
       setHeaderText(1, 'Width');
       setHeaderText(2, 'Flux');
       setHeaderText(3, 'Aspect Ratio');
+      setHeaderText(4, 'Angle');
 
       setColumnWidth(0, this.font.width('MMMMMMM'));
       setColumnWidth(1, this.font.width('MMMMMM'));
       setColumnWidth(2, this.font.width('MMMMMM'));
       setColumnWidth(3, this.font.width('MMMM'));
+      setColumnWidth(4, this.font.width('MMMM'));
 
       onNodeSelectionUpdated = function () {
          var stars = me.getSelectedStars();
