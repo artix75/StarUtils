@@ -108,7 +108,9 @@ var StarUtilsUI = {
                range: [0, 100],
                format: '%d%%',
                outputLabel: true,
-               tip: 'Percentage of biggest stars to extract PSF from.',
+               tip: "Width threshold for PSF data extarction. With lower values,\n"+
+                    "PSF will be calculated for more stars, but star detection\n"+
+                    "will take more time."
             },
          ]
       },
@@ -126,7 +128,9 @@ var StarUtilsUI = {
                range: [0, 100],
                format: '%d%%',
                outputLabel: true,
-               tip: 'Percentage of brightest stars to extract PSF from.',
+               tip: "Flux threshold for PSF data extarction. With lower values,\n"+
+                    "PSF will be calculated for more stars, but star detection\n"+
+                    "will take more time."
             },
          ]
       },
