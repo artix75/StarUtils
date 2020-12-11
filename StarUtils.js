@@ -106,6 +106,10 @@ function consoleFormattedString(string, style) {
    return string;
 }
 
+function capitalizedString(str) {
+   return str.charAt(0).toUpperCase() + str.substr(1);
+}
+
 function FWHM(func, sigma, beta, varshape) {
    if (beta === undefined || beta === null) beta = 2;
    if (varshape === true)
@@ -256,7 +260,7 @@ StarUtils.prototype = {
       var me = this;
       ['size', 'flux', 'width'].forEach(function (feat) {
          var pluralFeat = feat + (feat.match(/[s|x]$/) ? 'es' : 's');
-         var capitalized = feat.charAt(0).toUpperCase() + feat.substr(1);
+         var capitalized = capitalizedString(feat);
          var values = me[pluralFeat];
          if (!values) return;
          if (!stats[feat]) stats[feat] = {};
@@ -451,7 +455,7 @@ StarUtils.prototype = {
                      console.writeln("PSF " + k + " = " + val);
                      if (!isNaN(val)) {
                         if (!me.psfValues[k]) me.psfValues[k] = [];
-                        me.psfValues[k] << val;
+                        me.psfValues[k].push(val);
                      }
                   });
                   me.starsWithPSF.push(star);
@@ -459,6 +463,16 @@ StarUtils.prototype = {
          }
          me.updateProgress(i + 1, me.stars.length);
       });
+      /* Update stats with PSF info */
+      var psfAspectRatio = this.psfValues.aspectRatio;
+      if (psfAspectRatio && psfAspectRatio.length > 0){
+         if (!this.stats.psf) this.stats.psf = {};
+         if (!this.stats.psf.aspectRatio) this.stats.psf.aspectRatio = {};
+         this.stats.psf.aspectRatio.min = Math.minElem(psfAspectRatio);
+         this.stats.psf.aspectRatio.max = Math.maxElem(psfAspectRatio);
+         this.stats.psf.aspectRatio.avg = Math.mean(psfAspectRatio);
+         this.stats.psf.aspectRatio.stdDev = Math.stdDev(psfAspectRatio);
+      }
    },
    createStarImage: function (stars, opts) {
       opts = opts || {};
@@ -1504,7 +1518,7 @@ StarUtils.prototype = {
          var col = is_mean ? '#666666' : '#aaaaaa';
          var label = null;
          if (varname.indexOf('stddev_') === 0) label = 'σ';
-         label = label || varname.charAt(0).toUpperCase() + varname.substr(1);
+         label = label || capitalizedString(varname);
          varname = feature + '_' + varname;
          if (grouped) {
             script.push('set arrow ' + (i+1) + ' from ' + varname +
@@ -1571,7 +1585,7 @@ StarUtils.prototype = {
          });
       };
       console.noteln("Feature: " + feature);
-      var featName = feature.charAt(0).toUpperCase() + feature.substr(1);
+      var featName = capitalizedString(feature);
       var plots = ['plot "' + dataFile + '" with lines smooth csplines ' +
          'title "' + featName + '"'];
       plots = plots.join(",\\\n");

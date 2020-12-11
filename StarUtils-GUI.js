@@ -634,10 +634,10 @@ function StatsDialog(parent) {
    this.__base__(parent);
    var me = this;
 
-   this.getFieldMaxWidth = function (stats) {
+   this.getFieldMaxWidth = function (fields) {
       if (this.fieldMaxWidth !== undefined) return this.fieldMaxWidth;
       var maxW = 0;
-      Object.keys(stats).forEach(field => {
+      fields.forEach(field => {
          var w = me.font.width(field + ': ');
          if (w > maxW) maxW = w;
       });
@@ -645,6 +645,23 @@ function StatsDialog(parent) {
       else this.fieldMaxWidth = maxW;
       return maxW;
    };
+
+   this.renderStatsRow = function (sizer, field, value, allLabels) {
+      var name = capitalizedString(field.replace(/_+/g, ' '));
+      var rowsizer = new HorizontalSizer;
+      var fieldLbl = new Label(this);
+      fieldLbl.text = name + ': ';
+      fieldLbl.setFixedWidth(this.getFieldMaxWidth(allLabels));
+      fieldLbl.textAlignment = TextAlign_VertCenter | TextAlign_Right;
+      var valueLbl = new Label(me);
+      if (typeof(value) === 'string' && value.match(/^[\d\.\-\+]+$/))
+         valueLbl.text = format('%.2f', value || 0);
+      else valueLbl.text = '' + value;
+      valueLbl.textAlignment = TextAlign_VertCenter;
+      rowsizer.add(fieldLbl);
+      rowsizer.add(valueLbl);
+      sizer.add(rowsizer);
+   }
 
    this.drawCharts = function () {
       if (!this.starUtils) return;
@@ -694,29 +711,54 @@ function StatsDialog(parent) {
    this.updateStats = function () {
       if (!this.starUtils) return;
       var stats = this.starUtils.stats;
-      //console.noteln(JSON.stringify(stats, null, 4));
       var sizer = this.statsBox.viewport.sizer;
-      ['width', 'flux'].forEach(function (quantity) {
-         var name = quantity.charAt(0).toUpperCase() + quantity.substr(1);
-         var dtlStats = stats[quantity];
-         var hdrsizer = new HorizontalSizer;//parent.createHorizontalSizer(me);
-         var header = new Label(me);
+      //console.noteln(JSON.stringify(stats, null, 4));
+
+      /* Global Stats */
+      var starsWithPSF = this.starUtils.starsWithPSF.length;
+      var globalStats = {
+         Detected_Stars: this.starUtils.stars.length,
+         Stars_with_PSF: format('%d (%d%%)', starsWithPSF,
+            Math.round((starsWithPSF / this.starUtils.stars.length)*100)
+         ),
+      };
+      var psfStats = (stats.psf || {});
+      Object.keys(psfStats).forEach(psfProp => {
+         var propStats = psfStats[psfProp] || {};
+         Object.keys(propStats).forEach(property => {
+            var name = capitalizedString(psfProp) + '_' +
+               capitalizedString(property);
+            globalStats[name] = propStats[property];
+         });
+      });
+
+      var statLabels = Object.keys(globalStats).
+         concat(Object.keys(stats.width));
+
+      var hdrsizer = new HorizontalSizer;
+      var header = new Label(me);
+      header.useRichText = true;
+      header.text = '<b>General</b>';
+      hdrsizer.add(header, 0, Align_Left);
+      sizer.add(hdrsizer);
+
+      Object.keys(globalStats).forEach(property => {
+         var value = globalStats[property];
+         me.renderStatsRow(sizer, property, value, statLabels);
+      });
+
+      ['width', 'flux'].forEach(function (property) {
+         var name = capitalizedString(property);
+         var dtlStats = stats[property];
+         hdrsizer = new HorizontalSizer;
+         header = new Label(me);
          header.useRichText = true;
          header.text = "<b>Star " + name + '</b>';
          hdrsizer.add(header, 0, Align_Left);
          sizer.add(hdrsizer);
          Object.keys(dtlStats).forEach(field => {
-            var rowsizer = new HorizontalSizer;
-            var fieldLbl = new Label(me);
-            fieldLbl.text = field + ': ';
-            fieldLbl.setFixedWidth(me.getFieldMaxWidth(dtlStats));
-            fieldLbl.textAlignment = TextAlign_VertCenter | TextAlign_Right;
-            var valueLbl = new Label(me);
-            valueLbl.text = format('%.2f', dtlStats[field] || 0);
-            valueLbl.textAlignment = TextAlign_VertCenter;
-            rowsizer.add(fieldLbl);
-            rowsizer.add(valueLbl);
-            sizer.add(rowsizer);
+            var value = dtlStats[field];
+            me.renderStatsRow(sizer, field, value, statLabels);
          });
       });
       this.statsBox.viewport.update();
