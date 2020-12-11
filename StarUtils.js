@@ -106,6 +106,33 @@ function consoleFormattedString(string, style) {
    return string;
 }
 
+function FWHM(func, sigma, beta, varshape) {
+   if (beta === undefined || beta === null) beta = 2;
+   if (varshape === true)
+      return 2 * sigma * Math.pow(beta*0.6931471805599453, 1/beta);
+   switch (func) {
+       case DynamicPSF.prototype.Function_Gaussian:
+         return 2.3548200450309493 * sigma;
+       case DynamicPSF.prototype.Function_Moffat:
+         return 2 * sigma * Math.sqrt(Math.pow2(1/beta) - 1);
+       case DynamicPSF.prototype.Function_Moffat10:
+         return 0.5358113941912513 * sigma;
+       case DynamicPSF.prototype.Function_Moffat8:
+         return 0.6016900619596693 * sigma;
+       case DynamicPSF.prototype.Function_Moffat6:
+         return 0.6998915581984769 * sigma;
+       case DynamicPSF.prototype.Function_Moffat:
+          return 0.8699588840921645 * sigma;
+       case DynamicPSF.prototype.Function_Moffat25:
+          return 1.1305006161394060 * sigma;
+       case DynamicPSF.prototype.Function_Moffat15:
+          return 1.5328418730817597 * sigma;
+       case DynamicPSF.prototype.Function_Lorentzian:
+          return 2 * sigma;
+       default: return 0; // ?!
+   }
+}
+
 function StarUtils(opts) {
    this.initialize(opts);
 };
@@ -391,18 +418,37 @@ StarUtils.prototype = {
          bottom = top + side;
          star.enlargedRect = new Rect(left, top, right, bottom);
          if (do_get_psf) {
-            var psf = me.detectPSF(star, lview);
-            var psfmsg = "PSF rows: " + psf.length;
-            if (psf.length > 0) {
+            var psfrows = me.detectPSF(star, lview);
+            var psfmsg = "PSF rows: " + psfrows.length;
+            var psf = null;
+            if (psfrows.length > 0) {
+               psf = psfrows[0];
+               var fwhm;
+               if ((fwhm = psf.FWHMx)) {
+                  var xr = fwhm / star.width;
+                  if (xr >= 1.75) {
+                     console.warningln(
+                        format("WARN: abnormal FWHM to width ratio: %.2f!", xr)+
+                        " DynamicPSF probabily detected two stars, " +
+                        "retrying with automatic aperture diabled..."
+                     );
+                     psf = null;
+                     psfrows = me.detectPSF(star, lview, {autoAperture: false});
+                     if (psfrows.length > 0) psf = psfrows[0];
+                  }
+               }
+            }
+            if (psfrows.length > 0) {
                   console.noteln(psfmsg);
-                  star.psf = psf[0];
+                  star.psf = psf;
                   console.writeln("PSF center=" + star.psf.cx + ',' + star.psf.cy);
                   console.writeln("Star center=" + star.pos.x + ',' + star.pos.y);
                   console.writeln("PSF size=" + star.psf.sx + ',' + star.psf.sy);
-                  console.writeln("Star size=" + star.rect.width);
+                  console.writeln("Star size=" + star.width);
                   console.writeln("PSF angle=" + star.psf.angle);
                   Object.keys(star.psf).forEach(function (k) {
                      var val = star.psf[k];
+                 console.warningln("PSF " + k + " = " + val);
                      if (!isNaN(val)) {
                         if (!me.psfValues[k]) me.psfValues[k] = [];
                         me.psfValues[k] << val;
@@ -770,7 +816,8 @@ StarUtils.prototype = {
       new_view.window.hide();
       return new_view;
    },
-   detectPSF: function (star, view) {
+   detectPSF: function (star, view, opts) {
+      opts = opts || {};
       var r = star.rect;
       var d = r.width / 2;
       r = new Rect(r.x0 - d, r.y0 - d, r.x1 + d, r.y1 + d);
@@ -796,6 +843,7 @@ StarUtils.prototype = {
       P.gaussianPSF = false;
       P.signedAngles = false;
       P.autoVariableShapePSF = false;
+      P.autoAperture = opts.autoAperture !== false;
       /*
       P.moffatPSF = false;
       P.moffat10PSF = false;
@@ -814,7 +862,7 @@ StarUtils.prototype = {
       P.astrometry = true;
 
       P.threshold = 1.00;
-      P.autoAperture = true;
+
       P.scaleMode = DynamicPSF.prototype.Scale_Pixels;*/
 
       /*P.scaleValue = 1.00;
@@ -825,10 +873,17 @@ StarUtils.prototype = {
       P.badStarColor = 4294901760;
       P.badStarFillColor = 2164195328;*/
 
+     var scale = P.scaleValue || 1.0;
+     var varshape = (P.variableShapePSF === true);
+
       P.executeGlobal();
       var psf = [];
       P.psf.forEach(function (row) {
             // starIndex, function, circular, status, B, A, cx, cy, sx, sy, theta, beta, mad, celestial, alpha, delta, flux, meanSignal
+            var fwhm = {
+               x: FWHM(row[1], row[8], row[11], varshape),
+               y: FWHM(row[1], row[9], row[11], varshape),
+            };
             psf.push({
                func: row[1],
                circular: row[2],
@@ -849,6 +904,8 @@ StarUtils.prototype = {
                flux: row[16],
                meanSignal: row[17],
                aspectRatio: row[9] / row[8], // 1 = perfect circle, < 1 rounded circle
+               FWHMx: fwhm.x,
+               FWHMy: fwhm.y,
             });
       });
       return psf;
