@@ -394,7 +394,7 @@ StarUtils.prototype = {
                   var key = thresholdKeys[j];
                   var val = star[key];
                   if (!isNaN(val)) {
-                     do_get_psf = (val >= psfThreshold[key]);
+                     do_get_psf = (val > psfThreshold[key]);
                      if (!do_get_psf) break;
                   }
                }
@@ -448,7 +448,7 @@ StarUtils.prototype = {
                   console.writeln("PSF angle=" + star.psf.angle);
                   Object.keys(star.psf).forEach(function (k) {
                      var val = star.psf[k];
-                 console.warningln("PSF " + k + " = " + val);
+                     console.writeln("PSF " + k + " = " + val);
                      if (!isNaN(val)) {
                         if (!me.psfValues[k]) me.psfValues[k] = [];
                         me.psfValues[k] << val;

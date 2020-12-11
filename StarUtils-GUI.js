@@ -104,7 +104,7 @@ var StarUtilsUI = {
                label: 'Percentage',
                name: 'detectPSFThreshold.width',
                type: HorizontalSlider,
-               value: 50,
+               value: 25,
                range: [0, 100],
                format: '%d%%',
                outputLabel: true,
@@ -122,7 +122,7 @@ var StarUtilsUI = {
                label: 'Percentage',
                name: 'detectPSFThreshold.flux',
                type: HorizontalSlider,
-               value: 30,
+               value: 15,
                range: [0, 100],
                format: '%d%%',
                outputLabel: true,
@@ -1000,6 +1000,8 @@ function StarUtilsDialog (options) {
             this.leftPanel.show();
             this.centerPanel.hide();
             this.rightPanel.hide();
+            this.statsButton.hide();
+            this.createMaskButton.hide();
          }
       } else {
          this.analyzeButton.enabled = false;
@@ -1012,6 +1014,8 @@ function StarUtilsDialog (options) {
             this.leftPanel.hide();
             this.centerPanel.show();
             this.rightPanel.show();
+            this.statsButton.show();
+            this.createMaskButton.show();
          }
       }
       this.adjustToContents();
@@ -1060,6 +1064,10 @@ function StarUtilsDialog (options) {
          this.resetButton.enabled = true;
          this.populateStarList(sd.stars);
          this.starsDetected = (sd.stars.length > 0);
+         this.foundStarsLabel.text = this.foundStarsLabel.text + ' ' + format(
+            '(With PSF: %d%%)',
+            Math.round((sd.starsWithPSF.length / sd.stars.length)*100)
+         );
          this.updateUI();
          this.previewDisplayDetectedStars();
          with (this.previewControl.toggleDetectedStarsBtn) {
@@ -1067,6 +1075,10 @@ function StarUtilsDialog (options) {
             enabled = true;
          }
          this.previewControl.clearSelectedStarsBtn.enabled = true;
+         if (sd.starsWithPSF.length === 0) {
+            this.alert("Warning: no star has PSF data. Try lowering PSF " +
+               "thresholds");
+         }
       } catch (e) {
          me.deleteStarUtils();
          this.analyzeButton.enabled = true;
