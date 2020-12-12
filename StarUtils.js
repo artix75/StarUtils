@@ -196,6 +196,7 @@ StarUtils.prototype = {
          lview.window.hide();
          this.temporaryWindows.push(lview.window);
       } else this.luminanceView = this.win.mainView;
+      this.setStatus('Detecting stars');
       var stars = this.sd.stars(lview.image);
       var targetArea = this.opts.targetArea;
       if (targetArea) {

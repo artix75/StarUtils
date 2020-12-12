@@ -101,14 +101,14 @@ var StarUtilsUI = {
          checkbox: true,
          children: [
             {
-               label: 'Percentage',
+               //label: 'Percentage',
                name: 'detectPSFThreshold.width',
                type: HorizontalSlider,
                value: 25,
                range: [0, 100],
                format: '%d%%',
                outputLabel: true,
-               tip: "Width threshold for PSF data extarction. With lower values,\n"+
+               tip: "Width threshold for PSF data extraction. With lower values,\n"+
                     "PSF will be calculated for more stars, but star detection\n"+
                     "will take more time."
             },
@@ -121,14 +121,14 @@ var StarUtilsUI = {
          checkbox: true,
          children: [
             {
-               label: 'Percentage',
+               //label: 'Percentage',
                name: 'detectPSFThreshold.flux',
                type: HorizontalSlider,
                value: 15,
                range: [0, 100],
                format: '%d%%',
                outputLabel: true,
-               tip: "Flux threshold for PSF data extarction. With lower values,\n"+
+               tip: "Flux threshold for PSF data extraction. With lower values,\n"+
                     "PSF will be calculated for more stars, but star detection\n"+
                     "will take more time."
             },
@@ -156,7 +156,8 @@ var StarUtilsUI = {
          range: [0, 100],
          format: '%d%%',
          outputLabel: true,
-         tip: 'Threshold of biggest stars to be used for mask creation.',
+         tip: "Width threshold to determine which stars will be used for the mask.\n"+
+              "Lower values will select more stars."
       },
       {
          label: 'Flux',
@@ -166,15 +167,9 @@ var StarUtilsUI = {
          range: [0, 100],
          format: '%d%%',
          outputLabel: true,
-         tip: 'Threshold of brightest stars to be used for mask creation.',
+         tip: "Flux threshold to determine which stars will be used for the mask.\n"+
+              "Lower values will select more stars."
       },
-      /*{
-         label: 'Create Mask',
-         type: PushButton,
-         propertyName: 'createMaskButton',
-         tip: 'Create mask.',
-         align: Align_Center
-      },*/
    ],
    fixElongatedStars: [
       {
@@ -184,7 +179,7 @@ var StarUtilsUI = {
          value: 0.9,
          range: [0, 1],
          tip: "Threshold for the star\'s aspect ratio. Only stars having an \n"+
-              "aspect ratio lower than the threshold will be fixed.\n" +
+              "aspect ratio lower than this threshold will be fixed.\n" +
               "(A perfect rounded star has an aspect ratio of 1)"
       },
       {
@@ -842,6 +837,7 @@ function StarUtilsDialog (options) {
 
    this.deleteStarUtils = function () {
       if (this.starUtils) {
+         this.onStatusUpdate('Closing temporary images');
          this.starUtils.closeTemporaryWindows();
          this.bitmaps = null;
       }
@@ -1111,7 +1107,7 @@ function StarUtilsDialog (options) {
          this.populateStarList(sd.stars);
          this.starsDetected = (sd.stars.length > 0);
          this.foundStarsLabel.text = this.foundStarsLabel.text + ' ' + format(
-            '(With PSF: %d%%)',
+            '(PSF on: %d%%)',
             Math.round((sd.starsWithPSF.length / sd.stars.length)*100)
          );
          this.updateUI();
@@ -1212,7 +1208,7 @@ function StarUtilsDialog (options) {
       if (control.tip) element.toolTip = control.tip;
       var value = control.value;
       var align = control.align;
-      if (align === undefined) align = Align_Left;
+      if (align === undefined) align = Align_Default;
       var elementSizer = null;
       var isGroupBox = (type === GroupBox);
       var isButton = (type === PushButton);
@@ -1239,19 +1235,24 @@ function StarUtilsDialog (options) {
             element.value = value;
             if (element.setValue) element.setValue(value);
          }
+         var precision = control.precision || 2;
+         if (element.setPrecision) element.setPrecision(precision);
          //var extraSizer = null;
          //element.setFixedWidth(numericEditW);
+         var elemAlign = align;
          elementSizer = me.createHorizontalSizer(sizer);
          if (label) elementSizer.add(label, 0, align);
-         if (type === SpinBox || type === HorizontalSlider)
+         if (type === SpinBox || type === HorizontalSlider) {
             elementSizer.addUnscaledSpacing(oneCharW);
-         elementSizer.add(element, 1, align);
-         if (type === SpinBox) {
+            if (type === SpinBox) elemAlign = Align_Left;
+         }
+         elementSizer.add(element, 1, elemAlign);
+         /*if (type === SpinBox) {
             //element.setFixedWidth(numericEditW);
             //elementSizer.addUnscaledSpacing(numericEditW);
          } else if (type === HorizontalSlider) {
-            element.setFixedWidth(numericEditW);
-         }
+            //element.setFixedWidth(numericEditW);
+         }*/
          if (control.outputLabel) {
             var updateText = function (val) {
                if (control.format)
