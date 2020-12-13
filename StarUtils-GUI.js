@@ -1037,6 +1037,11 @@ function StarUtilsDialog (options) {
       return starAtPos;
    }
 
+   this.updateSelectedStarsLabel = function () {
+      me.selectedStarsCountLabel.text = format(' (%d selected)',
+         me.starListBox.selectedNodes.length);
+   };
+
    this.updateUI = function (opts) {
       opts = opts || {};
       var collapsablePanels = this.options.collapsablePanels !== false &&
@@ -1075,6 +1080,7 @@ function StarUtilsDialog (options) {
             this.createMaskButton.show();
          }
       }
+      this.updateSelectedStarsLabel();
       this.adjustToContents();
    };
 
@@ -1484,8 +1490,14 @@ function StarUtilsDialog (options) {
    this.leftSizer.add(this.psfSection, 1);
    this.leftSizer.add(PSFBox, 1);
 
+   var starListLabelSizer = this.createHorizontalSizer();
    var starListLbl = new Label(this);
    starListLbl.text = 'Stars';
+   this.selectedStarsCountLabel = new Label(this);
+   this.selectedStarsCountLabel.text = '';
+   starListLabelSizer.add(starListLbl, 0, Align_Left);
+   starListLabelSizer.add(this.selectedStarsCountLabel, 1, Align_Left);
+
    this.starListBox = new TreeBox(this);
    with (this.starListBox) {
       alternateRowColor = true;
@@ -1508,6 +1520,7 @@ function StarUtilsDialog (options) {
 
       onNodeSelectionUpdated = function () {
          var stars = me.getSelectedStars();
+         me.updateSelectedStarsLabel();
          me.setPreviewImage(stars, {
             zoom: null
          });
@@ -1515,6 +1528,7 @@ function StarUtilsDialog (options) {
 
       onNodeDoubleClicked = function (node) {
          var star = node.star;
+         me.updateSelectedStarsLabel();
          if (star) {
             me.previewZoomToStars([star]);
          }
@@ -1554,6 +1568,7 @@ function StarUtilsDialog (options) {
                me.starListBox.selectedNodes.forEach(node => {
                   node.selected = false;
                });
+               me.updateSelectedStarsLabel();
                me.previewSetImageWithNoMarks({zoom: zoom});
             }
          }
@@ -1580,9 +1595,11 @@ function StarUtilsDialog (options) {
                star.node.selected = !star.node.selected;
                me.setPreviewImage(me.getSelectedStars(), {zoom: zoom});
             }
+            me.updateSelectedStarsLabel();
          }
       }
    };
+
    this.previewControl.onCustomMouseDoubleClick = function (x, y, state, mod) {
       var star = me.getStarAtPosition(x, y);
       if (!star) return;
@@ -1593,10 +1610,11 @@ function StarUtilsDialog (options) {
          me.starListBox.currentNode = star.node;
          me.setPreviewImage(me.getSelectedStars());
          me.previewZoomToStars([star]);
+         me.updateSelectedStarsLabel();
       }
    };
    this.previewControl.setImage(null, {});
-   this.centerSizer.add(starListLbl);
+   this.centerSizer.add(starListLabelSizer);
    this.centerSizer.add(this.starListBox);
    this.centerSizer.add(this.previewControl);
 
