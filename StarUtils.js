@@ -1029,6 +1029,7 @@ StarUtils.prototype = {
          this.classifyStars();
       }
       var stars = this.starsWithPSF;
+      if (opts.filter) stars = stars.filter(opts.filter);
       var len = stars.length;
       if (len === 0) return;
       var me = this;

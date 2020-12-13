@@ -183,6 +183,21 @@ var StarUtilsUI = {
               "(A perfect rounded star has an aspect ratio of 1)"
       },
       {
+         label: 'Fix Factor',
+         propertyName: 'fixElongatedStarsFixFactor',
+         type: NumericControl,
+         value: 1,
+         range: [0.1, 1],
+         tip: "Lower this value in order to apply a smaller fix"
+      },
+      {
+         label: 'Only fix selected stars',
+         propertyName: 'fixElongatedStarsOnlySelected',
+         type: CheckBox,
+         checked: false,
+         //tip: "Keep masks used to fix stars",
+      },
+      {
          label: 'Keep Masks',
          propertyName: 'fixElongatedStarsKeepMasks',
          type: CheckBox,
@@ -1223,7 +1238,7 @@ function StarUtilsDialog (options) {
          if (!labelWidth && opts.section)
             labelWidth = this.calculateLabelFixedWidth(label, opts.section);
          labelWidth = labelWidth || labelW;
-         label.setFixedWidth(labelWidth);
+         if (!isCheckbox)label.setFixedWidth(labelWidth);
       }
       if (type === NumericControl || type === NumericEdit ||
           type === SpinBox || type === HorizontalSlider)
@@ -1363,11 +1378,20 @@ function StarUtilsDialog (options) {
       try {
          if (doFixElongation) {
             var threshold = me.fixElongatedStarsThreshold.value;
+            var factor = me.fixElongatedStarsFixFactor.value;
             var keepMask = me.fixElongatedStarsKeepMasks.checked;
-            console.noteln(threshold);
+            var filter = null;
+            if (me.fixElongatedStarsOnlySelected.checked) {
+               var stars = me.getSelectedStars();
+               var selected = {};
+               stars.forEach(star => {selected[star.id] = true});
+               filter = function (star) {return selected[star.id] === true};
+            }
             var fixOpts = {
                threshold: threshold,
-               keepMask: keepMask
+               fixFactor: factor,
+               keepMask: keepMask,
+               filter: filter,
             };
             sd.fixElongatedStars(fixOpts);
          }
