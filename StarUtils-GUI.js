@@ -410,7 +410,7 @@ function PreviewControl(parent, opts) {
       if (metadata && metadata.originalImage)
          this.srcImage = new Image(this.metadata.originalImage);
       this.setZoomOutLimit();
-      this.updateZoom(metadata.zoom || -100);
+      this.updateZoom(metadata.zoom || this.zoomThatFits());
    }
 
    this.createImageWindow = function (windowId) {
@@ -473,6 +473,18 @@ function PreviewControl(parent, opts) {
          this.scrollbox.verticalScrollPosition = (imgy*this.scale)-refPoint.y;
       this.scrollbox.viewport.update();
    }
+
+   this.zoomThatFits = function () {
+      var imgW = this.metadata.width, imgH = this.metadata.height,
+      vpW = this.scrollbox.viewport.width,
+      vpH = this.scrollbox.viewport.height;
+      return Math.min(vpW / imgW, vpH / imgH);
+   };
+
+   this.zoomToFit = function () {
+      var zoom = this.zoomThatFits();
+      this.updateZoom(zoom);
+   };
 
    this.scrollTo = function (x, y) {
       x *= this.zoom;
@@ -827,6 +839,7 @@ function StarUtilsDialog (options) {
 
    this.onShow = function () {
       me.updateUI();
+      me.restyle();
    }
 
    this.getOptions = function () {
@@ -1540,6 +1553,8 @@ function StarUtilsDialog (options) {
 
    }
    this.previewControl = new PreviewControl(this, {
+      /*minWidth: 480,
+      minHeight :360,*/
       extraButtons: [
          {
             name: 'toggleDetectedStarsBtn',
@@ -1549,7 +1564,8 @@ function StarUtilsDialog (options) {
             enabled: false,
             tooltip: 'Display detected stars',
             onCheck: function () {
-               var zoom = me.previewControl.zoom || -100;
+               var zoom = me.previewControl.zoom ||
+                          me.previewControl.zoomThatFits;
                if (this.checked) {
                   var bmpID = me.previewBitmapID;
                   if (bmpID === 'detectedStars') return;
@@ -1568,7 +1584,8 @@ function StarUtilsDialog (options) {
             tooltip: 'Clear selected stars',
             enabled: false,
             onClick: function () {
-               var zoom = me.previewControl.zoom || -100;
+               var zoom = me.previewControl.zoom ||
+                          me.previewControl.zoomThatFits;
                me.starListBox.selectedNodes.forEach(node => {
                   node.selected = false;
                });
@@ -1587,7 +1604,7 @@ function StarUtilsDialog (options) {
          if (star.node) {
             var do_add =
                (mod === KeyModifier_Control || mod === KeyModifier_Meta);
-            var zoom = me.previewControl.zoom || -100;
+            var zoom = me.previewControl.zoom || me.previewControl.zoomThatFits;
             if (!do_add) {
                me.starListBox.selectedNodes.forEach(node => {
                   node.selected = false;
@@ -1796,6 +1813,7 @@ function StarUtilsDialog (options) {
    this.sizer.add(this.actionSizer);
 
    this.windowTitle = "StarUtils";
+   this.updateUI();
    this.adjustToContents();
 };
 
