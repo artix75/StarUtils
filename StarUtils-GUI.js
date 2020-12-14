@@ -914,6 +914,8 @@ function StarUtilsDialog (options) {
             node.setText(3,'---');
             node.setText(4,'---');
          }
+         for (c = 1; c < listBox.numberOfColumns; c++)
+            node.setAlignment(c, Align_Right);
          node.star = star;
          star.node = node;
          listBox.add(node);
