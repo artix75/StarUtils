@@ -1049,6 +1049,7 @@ function StarUtilsDialog (options) {
       var collapsablePanels = this.options.collapsablePanels !== false &&
                               opts.collapsePanels !== false;
       if (!this.starUtils || !this.starsDetected) {
+         this.viewList.enabled = true;
          this.analyzeButton.enabled = true;
          this.createMaskButton.enabled = false;
          this.statsButton.enabled = false;
@@ -1068,6 +1069,7 @@ function StarUtilsDialog (options) {
             this.createMaskButton.hide();
          }
       } else {
+         this.viewList.enabled = false;
          this.analyzeButton.enabled = false;
          this.statsButton.enabled = true;
          this.createMaskButton.enabled = true;
