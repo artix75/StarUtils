@@ -1571,8 +1571,8 @@ function StarUtilsDialog (options) {
 
    }
    this.previewControl = new PreviewControl(this, {
-      /*minWidth: 480,
-      minHeight :360,*/
+      minWidth: 480,
+      minHeight :360,
       extraButtons: [
          {
             name: 'toggleDetectedStarsBtn',
@@ -1750,7 +1750,8 @@ function StarUtilsDialog (options) {
    this.createMaskButton = new PushButton(this);
    this.createMaskButton.text = 'Create Mask';
    this.createMaskButton.icon = this.scaledResource(
-      ":/toolbar/image-display-value.png"
+      //":/toolbar/image-display-value.png"
+      ":/icons/windows.png"
    );
 
    this.createMaskButton.onClick = function () {
