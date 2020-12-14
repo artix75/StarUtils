@@ -1059,6 +1059,8 @@ function StarUtilsDialog (options) {
 
    this.updateUI = function (opts) {
       opts = opts || {};
+      var curPos = this.position, curWidth = this.width,
+          curHeight = this.height;
       var collapsablePanels = this.options.collapsablePanels !== false &&
                               opts.collapsePanels !== false;
       if (!this.starUtils || !this.starsDetected) {
@@ -1099,6 +1101,19 @@ function StarUtilsDialog (options) {
       }
       this.updateSelectedStarsLabel();
       this.adjustToContents();
+      if (this.visible) {
+         var newWidth = this.width, newHeight = this.height, newX = null,
+             newY = null;
+         if (newWidth != curWidth) newX = curPos.x -
+            ((newWidth - curWidth) / 2);
+         if (newHeight != curHeight) newY = curPos.y -
+            ((newHeight - curHeight) / 2);
+         if (newX !== null || newHeight !== null) {
+            if (newX === null) newX = curPos.x;
+            if (newY === null) newY = curPos.y;
+            this.move(newX, newY);
+         }
+      }
    };
 
    this.reset = function (opts) {
@@ -1487,6 +1502,7 @@ function StarUtilsDialog (options) {
             section: 'starDetector'
          });
       });
+      sizer.addStretch();
    }
    this.starDetectorSection = new SectionBar(this, 'Star Detection');
    this.starDetectorSection.setSection(this.starDetectorBox);
@@ -1498,6 +1514,7 @@ function StarUtilsDialog (options) {
       StarUtilsUI.PSF.forEach(control => {
          var element = me.createControl(control, sizer, {section: 'PSF'});
       });
+      sizer.addStretch();
    }
    this.psfSection = new SectionBar(this, 'PSF');
    this.psfSection.setSection(PSFBox);
@@ -1506,6 +1523,7 @@ function StarUtilsDialog (options) {
    this.leftSizer.add(this.starDetectorBox, 1);
    this.leftSizer.add(this.psfSection, 1);
    this.leftSizer.add(PSFBox, 1);
+   this.leftSizer.addStretch();
 
    var starListLabelSizer = this.createHorizontalSizer();
    var starListLbl = new Label(this);
@@ -1662,6 +1680,7 @@ function StarUtilsDialog (options) {
          });
       });
       onCheck = function () {me.updateUI();};
+      sizer.addStretch();
    }
 
    var reduceStarsBox = this.reduceStarsBox = new GroupBox(this);
@@ -1675,11 +1694,13 @@ function StarUtilsDialog (options) {
          });
       });
       onCheck = function () {me.updateUI();};
+      sizer.addStretch();
    }
 
    this.rightSizer.add(maskBox);
    this.rightSizer.add(fixElongationBox);
    this.rightSizer.add(reduceStarsBox);
+   this.rightSizer.addStretch();
 
    this.statusSizer = this.createHorizontalSizer();
    var lbl = new Label(this);
