@@ -218,6 +218,17 @@ var StarUtilsUI = {
          range: [0.1, 0.45],
          tip: "Morphological selection. Lower values mean more reduction",
       },
+   ],
+   fixOptions: [
+      {
+         label: 'Create Process Container',
+         propertyName: 'fixCreateProcessContainer',
+         type: CheckBox,
+         checked: false,
+         onCheck: 'onCreateProcessContainerCheck',
+         tip: "Create a ProcessContainer instance containing all processes\n"+
+              "applied to fix stars",
+      },
    ]
 };
 
@@ -1409,6 +1420,9 @@ function StarUtilsDialog (options) {
             elementSizer.add(label, 1, Align_Left);
          }
          element.checked = control.checked === true;
+         var onCheck = control.onCheck;
+         if (typeof(onCheck) === 'string') onCheck = me[onCheck];
+         if (onCheck) element.onCheck = onCheck;
       } else if (isButton) {
          if (label) element.text = label;
          elementSizer = me.createHorizontalSizer(sizer);
@@ -1457,6 +1471,9 @@ function StarUtilsDialog (options) {
          alert("Both 'Fix Elongated Stars' && 'Reduce Stars' are disabled");
          return;
       }
+      var processContainer = this.processContainer = null;
+      if (this.fixCreateProcessContainer.checked)
+         processContainer = this.processContainer = new ProcessContainer;
       me.enabled = false;
       try {
          if (doFixElongation) {
@@ -1475,14 +1492,20 @@ function StarUtilsDialog (options) {
                fixFactor: factor,
                keepMask: keepMask,
                filter: filter,
+               processContainer: processContainer,
             };
             sd.fixElongatedStars(fixOpts);
          }
          me.progressBar.updateProgress(0, 0);
          if (doReduce) {
             var selection = me.reduceStarsSelection.value;
-            sd.reduceStars(null, null, {selection: selection});
+            var reduceOptions = {
+               selection: selection,
+               processContainer: processContainer,
+            };
+            sd.reduceStars(null, null, reduceOptions);
          }
+         if (processContainer) processContainer.launchInterface();
          me.reset({collapsePanels: false});
          me.startAnalysis();
       } catch (e) {
@@ -1504,6 +1527,11 @@ function StarUtilsDialog (options) {
       var stars = me.imageStars[view.fullId];
       if (!stars) return;
       me.updatePSFStarsLabel();
+   };
+
+   this.onCreateProcessContainerCheck = function (checked) {
+      if (checked)
+         me.alert("Warning: this option could generate too much mask images!");
    };
 
    var labelW = this.font.width("Upper Peak Limit:");
@@ -1762,9 +1790,23 @@ function StarUtilsDialog (options) {
       sizer.addStretch();
    }
 
+   var fixOptionsBox = this.fixOptionsBox = new GroupBox(this);
+   with (fixOptionsBox) {
+      title = 'Fix Options';
+      titleCheckBox = false;
+      sizer = me.createVerticalSizer(reduceStarsBox);
+      StarUtilsUI.fixOptions.forEach(control => {
+         var element = me.createControl(control, sizer, {
+            section: 'fixOptions'
+         });
+      });
+      sizer.addStretch();
+   }
+
    this.rightSizer.add(maskBox);
    this.rightSizer.add(fixElongationBox);
    this.rightSizer.add(reduceStarsBox);
+   this.rightSizer.add(fixOptionsBox);
    this.rightSizer.addStretch();
 
    this.statusSizer = this.createHorizontalSizer();

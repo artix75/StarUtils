@@ -110,6 +110,19 @@ function capitalizedString(str) {
    return str.charAt(0).toUpperCase() + str.substr(1);
 }
 
+function getTimeStamp(date, sep) {
+   if (!sep && sep !== ' ') sep = '-';
+   return format('%d%02d%02d%s%02d%02d%02d',
+      date.getFullYear(),
+      date.getMonth()+1,
+      date.getDate(),
+      sep,
+      date.getHours(),
+      date.getMinutes(),
+      date.getSeconds()
+   );
+}
+
 function FWHM(func, sigma, beta, varshape) {
    if (beta === undefined || beta === null) beta = 2;
    if (varshape === true)
@@ -188,7 +201,6 @@ StarUtils.prototype = {
       this.printHeader("Analyzing stars...");
       this.setStatus('Analyzing stars');
       var intvl = this.opts.sizeClassInterval || 10;
-      /* TODO: create luminance only if image is RGB */
       var lview = null;
       if (this.srcImage.isColor) {
          lview = this.createLuminanceImage(this.win.mainView);
@@ -483,6 +495,8 @@ StarUtils.prototype = {
          if (stars == this.bigStars) suffix = 'BigStars';
          else if (stars == this.averageStars) suffix = 'AverageStars';
          else if (stars == this.smallStars) suffix = 'SmallStars';
+         else if (stars.length === 1 && opts.starIDAsSuffix)
+            suffix = stars[0].id;
       }
       if (stars.length === 0) {
          console.warningln("WARN: no stars" + (suffix ? ' ['+suffix+']' : ''));
@@ -757,7 +771,7 @@ StarUtils.prototype = {
    cloneWindow: function (win, suffix, opts) {
       opts = opts || {};
       var img = win.mainView.image;
-      var is_temp = false;
+      var is_temp = (opts.temporary === true);
       if (!suffix) {
          suffix = 'tmp_' + randomID();
          is_temp = true;
@@ -947,6 +961,7 @@ StarUtils.prototype = {
       var deringing = (opts.deringing !== false);
       var deringingScale = opts.deringingScale || 1;
       var fixFactor = opts.fixFactor || 1;
+      var processContainer = opts.processContainer;
       var fixLen = 2 * fixFactor;
       var psf = star.psf;
       if (!psf) {
@@ -966,6 +981,8 @@ StarUtils.prototype = {
          dilation: structSize,
          convolution : convolution,
          hidden: true,
+         temporary: (processContainer ? true : false),
+         starIDAsSuffix: true,
       });
       if (!mask) {
          console.warningnl("Failed to create mask for star " + star.id);
@@ -981,12 +998,16 @@ StarUtils.prototype = {
       var deringingDark = (stdDev * deringingScale) / 1000;
       console.writeln("Fix elongated star " + star.id + ", StdDev: " + stdDev +
          ", Angle: " + psf.angle);
-      this.convolution(view, stdDev);
-      this.motionDeconvolution(view, sx * fixLen, psf.angle);
+      var processOpts = {processContainer: processContainer};
+      this.convolution(view, stdDev, processOpts);
+      this.motionDeconvolution(view, sx * fixLen, psf.angle, processOpts);
       this.deconvolution(view, stdDev, {
             deringing: deringing,
-            deringingDark: deringingDark
+            deringingDark: deringingDark,
+            processContainer: processContainer
       });
+      if (processContainer && processContainer.length >= 3)
+         processContainer.setMask(processContainer.length - 3, mask);
       win.removeMask();
       if (!wasProcessing) view.endProcess();
       var maskWindow = opts.maskWindow;
@@ -1009,7 +1030,7 @@ StarUtils.prototype = {
             }
          };
       }
-      mask.forceClose();
+      if (!processContainer) mask.forceClose();
    },
    fixElongatedStars: function (opts) {
       opts = opts || {};
@@ -1084,6 +1105,7 @@ StarUtils.prototype = {
       opts = opts || {};
       var selection = opts.selection || 0.25;
       if (selection > 0.45) selection = 0.45;
+      var processContainer = opts.processContainer;
       var me = this;
       if (!stars) {
          stars = this.stars;
@@ -1122,6 +1144,7 @@ StarUtils.prototype = {
       this.setStatus('Reducing stars');
       this.updateProgress(0, 0);
       var processed = 0;
+      var processOpts = {processContainer: processContainer};
       Object.keys(groups).forEach(function (structureSize) {
          var gstars = groups[structureSize];
          processed += gstars.length;
@@ -1130,6 +1153,7 @@ StarUtils.prototype = {
             dilation: structureSize,
             convolution : true,
             hidden: true,
+            temporary: (processContainer ? true : false),
          });
          if (!mask) {
             console.warningnl("Failed to create mask for star " + star.id);
@@ -1145,15 +1169,19 @@ StarUtils.prototype = {
          if (!wasProcessing) view.beginProcess(UndoFlag_NoSwapFile);
          win.maskVisible = false;
          win.setMask(mask);
-         me.morphologicalErosion(view, structureSize, selection);
+         me.morphologicalErosion(view, structureSize, selection, processOpts);
+         if (processContainer && processContainer.length > 0)
+            processContainer.setMask(processContainer.length - 1, mask);
          win.removeMask();
          if (!wasProcessing) view.endProcess();
          me.updateProgress(processed, len);
-         mask.forceClose();
+         if (!processContainer) mask.forceClose();
       });
       this.setStatus('Done');
    },
-   motionDeconvolution: function (view, length, angle) {
+   motionDeconvolution: function (view, length, angle, opts) {
+      opts = opts || {};
+      var processContainer = opts.processContainer;
       var P = new Deconvolution;
       P.algorithm = Deconvolution.prototype.RichardsonLucy;
       P.numberOfIterations = 10;
@@ -1192,7 +1220,7 @@ StarUtils.prototype = {
          [0],
          [0]
       ];
-
+      if (processContainer) processContainer.add(P);
       P.executeOn(view, false);
    },
    deconvolution: function (view, stdDev, opts) {
@@ -1201,6 +1229,7 @@ StarUtils.prototype = {
       var shape = opts.shape;
       var ratio = opts.ratio;
       var deringingDark = opts.deringingDark || 0.1000;
+      var processContainer = opts.processContainer;
       var P = new Deconvolution;
       P.algorithm = Deconvolution.prototype.RichardsonLucy;
       P.numberOfIterations = 10;
@@ -1239,11 +1268,15 @@ StarUtils.prototype = {
          [0],
          [0]
       ];
-
+      if (processContainer) processContainer.add(P);
       P.executeOn(view, false);
 
    },
-   convolution: function (view, stdDev, shape, ratio) {
+   convolution: function (view, stdDev, opts) {
+      opts = opts || {};
+      var shape = opts.shape;
+      var ratio = opts.ratio;
+      var processContainer = opts.processContainer;
       var P = new Convolution;
       P.mode = Convolution.prototype.Parametric;
       P.sigma = stdDev;
@@ -1253,9 +1286,12 @@ StarUtils.prototype = {
       P.filterSource = "";
       P.rescaleHighPass = false;
       P.viewId = "";
+      if (processContainer) processContainer.add(P);
       P.executeOn(view, false);
    },
-   morphologicalDilation: function (view, structureSize) {
+   morphologicalDilation: function (view, structureSize, opts) {
+      opts = opts || {};
+      var processContainer = opts.processContainer;
       if (structureSize === true) structureSize = 0;
       structureSize = structureSize || 5;
       structureSize = parseInt(structureSize);
@@ -1278,10 +1314,12 @@ StarUtils.prototype = {
          " Circular Structure";
       P.structureSize = structureSize;
       P.structureWayTable = [[mask]];// mask
-
+      if (processContainer) processContainer.add(P);
       P.executeOn(view);
    },
-   morphologicalErosion: function (view, structureSize, selection) {
+   morphologicalErosion: function (view, structureSize, selection, opts) {
+      opts = opts || {};
+      var processContainer = opts.processContainer;
       structureSize = structureSize || 5;
       var sizeKey = '' + structureSize;
       var masks = MorphologicalTransformationMasks;
@@ -1307,16 +1345,19 @@ StarUtils.prototype = {
          " Circular Structure";
       P.structureSize = parseInt(structureSize);
       P.structureWayTable = [[mask]];// mask
-
+      if (processContainer) processContainer.add(P);
       P.executeOn(view);
    },
-   binarize: function (view, threshold) {
+   binarize: function (view, threshold, opts) {
+      opts = opts || {};
+      var processContainer = opts.processContainer;
       threshold = threshold || 0.5;
       var P = new Binarize;
       P.thresholdRK = threshold;
       P.thresholdG = threshold;
       P.thresholdB = threshold;
       P.isGlobal = true;
+      if (processContainer) processContainer.add(P);
       P.executeOn(view);
    },
    getWindowBmp: function (win) {
