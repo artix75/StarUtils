@@ -202,11 +202,11 @@ var StarUtilsUI = {
          //tip: "Keep masks used to fix stars",
       },
       {
-         label: 'Keep Masks',
+         label: 'Keep Mask',
          propertyName: 'fixElongatedStarsKeepMasks',
          type: CheckBox,
          checked: true,
-         tip: "Keep masks used to fix stars",
+         tip: "Keep mask used to fix stars",
       },
    ],
    reduceStars: [
@@ -956,8 +956,10 @@ function StarUtilsDialog (options) {
             node.setText(3,'---');
             node.setText(4,'---');
          }
-         for (c = 1; c < listBox.numberOfColumns; c++)
+         for (c = 1; c < listBox.numberOfColumns; c++) {
             node.setAlignment(c, Align_Right);
+            listBox.adjustColumnWidthToContents(c);
+         }
          node.star = star;
          star.node = node;
          listBox.add(node);
@@ -1301,7 +1303,8 @@ function StarUtilsDialog (options) {
       if (!isGroupBox && !isButton && label) {
          var txt = label;
          label = new Label(element);
-         label.text = txt + ':';
+         label.text = txt;
+         if (!isCheckbox) label.text += ':';
          var lblAlign = (isCheckbox ? TextAlign_Left : TextAlign_Right);
          label.textAlignment = lblAlign | TextAlign_VertCenter;
          var labelWidth = opts.labelWidth || control.labelWidth;
@@ -1765,26 +1768,33 @@ function StarUtilsDialog (options) {
    this.rightSizer.addStretch();
 
    this.statusSizer = this.createHorizontalSizer();
+   var leftStatusSizer = this.createHorizontalSizer();
+   var middleStatusSizer = this.createHorizontalSizer();
+   var rightStatusSizer = this.createHorizontalSizer();
    var lbl = new Label(this);
    lbl.textAlignment = TextAlign_Right | TextAlign_VertCenter;
    lbl.text = 'Status: ';
    lbl.setFixedWidth(this.font.width(lbl.text));
-   this.statusSizer.add(lbl, 0, Align_Left);
+   leftStatusSizer.add(lbl, 0, Align_Left);
    this.statusLabel = new Label(this);
    this.statusLabel.useRichText = true;
    this.statusLabel.text = '---';
    this.statusLabel.textAlignment = TextAlign_Left | TextAlign_VertCenter;
-   this.statusSizer.add(this.statusLabel, 1, Align_Left);
+   leftStatusSizer.add(this.statusLabel, 1, Align_Left);
    this.progressLabel = new Label(this);
    this.progressLabel.text = '';
-   this.statusSizer.add(this.progressLabel, 1, Align_Left);
+   middleStatusSizer.add(this.progressLabel, 0, Align_Center);
    lbl = new Label(this);
    lbl.textAlignment = TextAlign_Right | TextAlign_VertCenter;
    lbl.text = ' Found stars: ';
-   this.statusSizer.add(lbl, 0, Align_Right);
+   rightStatusSizer.addStretch();
+   rightStatusSizer.add(lbl, 0, Align_Right);
    this.foundStarsLabel = new Label(this);
    this.foundStarsLabel.text = '---';
-   this.statusSizer.add(this.foundStarsLabel, 0, Align_Right);
+   rightStatusSizer.add(this.foundStarsLabel, 0, Align_Right);
+   this.statusSizer.add(leftStatusSizer, 1);
+   this.statusSizer.add(middleStatusSizer, 1);
+   this.statusSizer.add(rightStatusSizer, 1);
 
    this.actionSizer = this.createHorizontalSizer();
    this.analyzeButton = new PushButton(this);
