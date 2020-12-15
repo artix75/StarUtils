@@ -1505,6 +1505,15 @@ function StarUtilsDialog (options) {
             };
             sd.reduceStars(null, null, reduceOptions);
          }
+         var question = "Star fixing completed. Do you want to rescan image?";
+         var msgBox = new MessageBox(question, "StarUtils", StdIcon_Question,
+            StdButton_Yes, StdButton_No);
+         var res = msgBox.execute();
+         if (res === StdButton_No) {
+            me.deleteStarUtils();
+            me.cancel();
+            return;
+         }
          if (processContainer) processContainer.launchInterface();
          me.reset({collapsePanels: false});
          me.startAnalysis();
