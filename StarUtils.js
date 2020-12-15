@@ -690,7 +690,7 @@ StarUtils.prototype = {
          max = this.maxFlux;
       }
       if (!min && min !== 0) min = Math.minElem(values);
-      if (!max && max !== 0) max = Math.minElem(values);
+      if (!max && max !== 0) max = Math.maxElem(values);
       return (perc * (max - min)) + min;
    },
    printStats: function () {

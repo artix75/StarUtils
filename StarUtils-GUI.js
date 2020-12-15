@@ -103,11 +103,13 @@ var StarUtilsUI = {
             {
                //label: 'Percentage',
                name: 'detectPSFThreshold.width',
+               propertyName: 'psfThresholdWidth',
                type: HorizontalSlider,
                value: 25,
                range: [0, 100],
                format: '%d%%',
                outputLabel: true,
+               onValueUpdated: 'onPSFThresholdUpdated',
                tip: "Width threshold for PSF data extraction. With lower values,\n"+
                     "PSF will be calculated for more stars, but star detection\n"+
                     "will take more time."
@@ -123,11 +125,13 @@ var StarUtilsUI = {
             {
                //label: 'Percentage',
                name: 'detectPSFThreshold.flux',
+               propertyName: 'psfThresholdFlux',
                type: HorizontalSlider,
                value: 15,
                range: [0, 100],
                format: '%d%%',
                outputLabel: true,
+               onValueUpdated: 'onPSFThresholdUpdated',
                tip: "Flux threshold for PSF data extraction. With lower values,\n"+
                     "PSF will be calculated for more stars, but star detection\n"+
                     "will take more time."
@@ -830,6 +834,7 @@ function StarUtilsDialog (options) {
 
    this.starUtils = null;
    this.optControls = {};
+   this.imageStars = {};
    this.status = null;
    var me = this;
 
@@ -909,6 +914,30 @@ function StarUtilsDialog (options) {
       this.progressLabel.text = progress + '/' + tot;
       this.progressBar.updateProgress(progress, tot);
    };
+
+   this.updatePSFStarsLabel = function () {
+      var view = this.viewList.currentView;
+      if (!view) {
+         this.psfFoundStarsLabel.text = '';
+         return;
+      }
+      var stars = this.imageStars[view.fullId];
+      if (!stars) {
+         this.psfFoundStarsLabel.text = '';
+         return;
+      }
+      var widthThreshold = this.psfThresholdWidth.value;
+      var fluxThreshold = this.psfThresholdFlux.value;
+      var widths = stars.map(star => star.width);
+      var fluxes = stars.map(star => star.flux);
+      var getValueByPercentage = StarUtils.prototype.getValueByPercentage;
+      widthThreshold = getValueByPercentage.call(me, widthThreshold, widths);
+      fluxThreshold = getValueByPercentage.call(me, fluxThreshold, fluxes);
+      stars = stars.filter(star => {
+         return star.width > widthThreshold && star.flux > fluxThreshold;
+      });
+      this.psfFoundStarsLabel.text = format('%d star(s)', stars.length);
+   }
 
    this.populateStarList = function (stars) {
       this.starListBox.clear();
@@ -1100,8 +1129,10 @@ function StarUtilsDialog (options) {
          }
       }
       this.updateSelectedStarsLabel();
+      this.updatePSFStarsLabel();
       this.adjustToContents();
       if (this.visible) {
+         /* Re-center dialog */
          var newWidth = this.width, newHeight = this.height, newX = null,
              newY = null;
          if (newWidth != curWidth) newX = curPos.x -
@@ -1159,6 +1190,7 @@ function StarUtilsDialog (options) {
          this.resetButton.enabled = true;
          this.populateStarList(sd.stars);
          this.starsDetected = (sd.stars.length > 0);
+         this.imageStars[sd.win.currentView.fullId] = sd.stars;
          this.foundStarsLabel.text = this.foundStarsLabel.text + ' ' + format(
             '(PSF on: %d%%)',
             Math.round((sd.starsWithPSF.length / sd.stars.length)*100)
@@ -1306,6 +1338,10 @@ function StarUtilsDialog (options) {
          } else if (type === HorizontalSlider) {
             //element.setFixedWidth(numericEditW);
          }*/
+         var onValueUpdated = control.onValueUpdated;
+         if (onValueUpdated && typeof(onValueUpdated) === 'string')
+            onValueUpdated = me[onValueUpdated] || null;
+         var updateOutputLabel = null;
          if (control.outputLabel) {
             var updateText = function (val) {
                if (control.format)
@@ -1328,10 +1364,16 @@ function StarUtilsDialog (options) {
             outputWidth = outputWidth || numericEditW;
             outputLabel.textAlignment = TextAlign_Left|TextAlign_VertCenter;
             outputLabel.setFixedWidth(outputWidth);
-            element.onValueUpdated = updateText;
+            //element.onValueUpdated = updateText;
+            updateOutputLabel = updateText;
             elementSizer.add(outputLabel, 1, align);
          }
-         //if (extraSizer) elementSizer.add(extraSizer);
+         if (onValueUpdated || updateOutputLabel) {
+            element.onValueUpdated  = function (val) {
+               if (updateOutputLabel) updateOutputLabel.call(element, val);
+               if (onValueUpdated) onValueUpdated.call(element, val);
+            }
+         }
       } else if (isGroupBox) {
          if (label) element.title = label;
          if (control.checkbox) element.titleCheckBox = true;
@@ -1448,6 +1490,17 @@ function StarUtilsDialog (options) {
          throw e;
       }
       me.enabled = true;
+      delete me.imageStars[sd.win.currentView.fullId];
+   };
+
+   /* Event Handlers */
+
+   this.onPSFThresholdUpdated = function (val) {
+      var view = me.viewList.currentView;
+      if (!view) return;
+      var stars = me.imageStars[view.fullId];
+      if (!stars) return;
+      me.updatePSFStarsLabel();
    };
 
    var labelW = this.font.width("Upper Peak Limit:");
@@ -1492,6 +1545,9 @@ function StarUtilsDialog (options) {
    viewId += 'MMMMMM';
    this.viewList.setFixedWidth(this.font.width(viewId));
    viewListSizer.add(this.viewList, 1, Align_Left);
+   this.viewList.onViewSelected = function (v) {
+      me.updateUI();
+   }
 
    /* Star Detection Section */
    var starDetectorBox = this.starDetectorBox = new GroupBox(this);
@@ -1516,6 +1572,12 @@ function StarUtilsDialog (options) {
       });
       sizer.addStretch();
    }
+   this.psfFoundStarsLabel = new Label(this);
+   this.psfFoundStarsLabel.textAlignment = TextAlign_Center |
+      TextAlign_VertCenter;
+   this.psfFoundStarsLabel.text = '';
+   PSFBox.sizer.add(this.psfFoundStarsLabel);
+
    this.psfSection = new SectionBar(this, 'PSF');
    this.psfSection.setSection(PSFBox);
 
