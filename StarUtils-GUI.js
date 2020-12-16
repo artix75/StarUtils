@@ -33,6 +33,7 @@
 #include <pjsr/StdCursor.jsh>
 #include <pjsr/ButtonCodes.jsh>
 #include <pjsr/SectionBar.jsh>
+#include <pjsr/StdDialogCode.jsh>
 
 var StarUtilsUI = {
    starDetector: [
@@ -700,8 +701,10 @@ function StatsDialog(parent) {
             grouped: false,
             drawPercentageLines: {'25%': true, '50%': true, '75%': true}
          });
-         if (!res.created) {
-            parent.alert("Failed to create charts!");
+         if (!res || !res.created) {
+            var err = "Failed to create charts!";
+            if (res.error) err += "\n" + res.error;
+            parent.alert(err);
             return;
          }
          var imageFile = res.imageFile;
@@ -808,9 +811,27 @@ function StatsDialog(parent) {
    this.sizer.addStretch();
 
    this.onExecute = function () {
-      me.updateStats();
-      me.drawCharts();
+      try {
+         me.updateStats();
+         me.drawCharts();
+      } catch (e) {
+         me.error = e;
+         me.result = StdDialogCode_Cancel;
+      }
    };
+
+   this.onShow = function () {
+      if (this.error) {
+         var errmsg = "Error executing Stats Dialog:\n" + this.error.message;
+         var t = new Timer(2, false);
+         t.onTimeout = function () {
+            me.parent.exception = me.error;
+            me.parent.alert(errmsg);
+            me.cancel();
+         };
+         t.start();
+      }
+   }
 
    this.windowTitle = "StarUtils Statistics";
    this.adjustToContents();
@@ -1434,10 +1455,18 @@ function StarUtilsDialog (options) {
    };
 
    this.showStatsDialog = function () {
-      var dialog = this.getStatsDialog();
-      if (!dialog) return null;
-      dialog.execute();
-      return dialog;
+      try {
+         this.exception = null;
+         var dialog = this.getStatsDialog();
+         if (!dialog) return null;
+         var res = dialog.execute();
+         if (this.exception) throw this.exception;
+         return dialog;
+      } catch (e) {
+         me.deleteStarUtils();
+         me.cancel();
+         throw(e);
+      }
    };
 
    this.fixStars = function () {

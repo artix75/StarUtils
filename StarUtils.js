@@ -352,22 +352,8 @@ StarUtils.prototype = {
       this.starGroups[key] = grouped;
       return grouped;
    },
-   classifyStars: function () {
-      this.printHeader("Classifing stars...");
-      var bigStars = this.bigStars = [];
-      var averageStars = this.averageStars = [];
-      var smallStars = this.smallStars = [];
-      var psfValues = this.psfValues = {};
-
-      var stars = this.stars;
-      var upLimit = this.sizeLimits.high;
-      var downLimit = this.sizeLimits.low;
-      var avgFlux = this.avgFlux;
+   computePSFThreshold: function (psfThreshold) {
       var me = this;
-      var lview = this.luminanceView;
-      this.starsWithPSF = [];
-
-      var psfThreshold = this.opts.detectPSFThreshold;
       var psfThresholdFunc = null;
       if (typeof(psfThreshold) === 'function') psfThresholdFunc = psfThreshold;
       else if (!psfThreshold) {
@@ -393,6 +379,121 @@ StarUtils.prototype = {
             }
          });
       }
+      return {
+         psfThreshold: psfThreshold,
+         psfThresholdFunc: psfThresholdFunc,
+      };
+   },
+   shouldDetectPSF: function (star, threshold) {
+      if (!threshold) return true;
+      var psfThreshold = threshold.psfThreshold;
+      var psfThresholdFunc = threshold.psfThresholdFunc;
+      if (psfThresholdFunc) return psfThresholdFunc.call(me, star);
+      else {
+         var do_get_psf = false;
+         var j;
+         var thresholdKeys = Object.keys(psfThreshold);
+         var keylen = thresholdKeys.length;
+         for (j = 0; j < keylen; j++) {
+            var key = thresholdKeys[j];
+            var val = star[key];
+            if (!isNaN(val)) {
+               do_get_psf = (val > psfThreshold[key]);
+               if (!do_get_psf) break;
+            }
+         }
+         return do_get_psf;
+      }
+   },
+   getStarPSFData: function (star) {
+      var me = this;
+      var lview = this.luminanceView;
+      if (!lview) throw "Missing luminance view!";
+      var psfrows = this.detectPSF(star, lview);
+      var psfmsg = "PSF rows: " + psfrows.length;
+      var psf = null;
+      if (psfrows.length > 0) {
+         psf = psfrows[0];
+         var fwhm;
+         if ((fwhm = psf.FWHMx)) {
+            var xr = fwhm / star.width;
+            if (xr >= 1.75) {
+               console.warningln(
+                  format("WARN: abnormal FWHM to width ratio: %.2f!", xr)+
+                  " DynamicPSF probabily detected two stars, " +
+                  "retrying with automatic aperture diabled..."
+               );
+               psf = null;
+               psfrows = this.detectPSF(star, lview, {autoAperture: false});
+               if (psfrows.length > 0) psf = psfrows[0];
+            }
+         }
+      }
+      if (psf) {
+         console.noteln(psfmsg);
+         star.psf = psf;
+         console.writeln("PSF center=" + star.psf.cx + ',' + star.psf.cy);
+         console.writeln("Star center=" + star.pos.x + ',' + star.pos.y);
+         console.writeln("PSF size=" + star.psf.sx + ',' + star.psf.sy);
+         console.writeln("Star size=" + star.width);
+         console.writeln("PSF angle=" + star.psf.angle);
+         Object.keys(star.psf).forEach(function (k) {
+            var val = star.psf[k];
+            console.writeln("PSF " + k + " = " + val);
+            if (!isNaN(val)) {
+               if (!me.psfValues[k]) me.psfValues[k] = [];
+               me.psfValues[k].push(val);
+            }
+         });
+         me.starsWithPSF.push(star);
+      } else console.warningln(psfmsg);
+   },
+   recalculatePSF: function (stars, opts) {
+      var me = this;
+      stars = stars || this.stars;
+      opts = opts || {};
+      var detectPSFfThreshold = opts.detectPSFThreshold ||
+                                this.opts.detectPSFThreshold;
+      var psfThreshold = this.computePSFThreshold(detectPSFfThreshold);
+      if (opts.forced) this.psfValues = {};
+      stars.forEach(star => {
+         if (star.psf !== undefined && !opts.forced) return;
+         if (me.shouldDetectPSF(star, psfThreshold)) {
+            me.getStarPSFData(star);
+         }
+      });
+      this.updatePSFStats();
+   },
+   updatePSFStats: function () {
+      /* Update stats with PSF info */
+      var psfAspectRatio = this.psfValues.aspectRatio;
+      if (psfAspectRatio && psfAspectRatio.length > 0){
+         if (!this.stats.psf) this.stats.psf = {};
+         if (!this.stats.psf.aspectRatio) this.stats.psf.aspectRatio = {};
+         this.stats.psf.aspectRatio.min = Math.minElem(psfAspectRatio);
+         this.stats.psf.aspectRatio.max = Math.maxElem(psfAspectRatio);
+         this.stats.psf.aspectRatio.avg = Math.mean(psfAspectRatio);
+         this.stats.psf.aspectRatio.stdDev = Math.stdDev(psfAspectRatio);
+      }
+   },
+   classifyStars: function () {
+      this.printHeader("Classifing stars...");
+      var bigStars = this.bigStars = [];
+      var averageStars = this.averageStars = [];
+      var smallStars = this.smallStars = [];
+      var psfValues = this.psfValues = {};
+
+      var stars = this.stars;
+      var upLimit = this.sizeLimits.high;
+      var downLimit = this.sizeLimits.low;
+      var avgFlux = this.avgFlux;
+      var me = this;
+      var lview = this.luminanceView;
+      this.starsWithPSF = [];
+
+      var detectPSFfThreshold = this.opts.detectPSFThreshold;
+      var psfThreshold = this.computePSFThreshold(detectPSFfThreshold);
+
       this.setStatus('Classifying stars');
       this.updateProgress(0,0);
       var me = this;
@@ -400,23 +501,7 @@ StarUtils.prototype = {
          var perc = Math.round(((i+1) / stars.length) * 100);
          console.writeln('[' + (i + 1) + '/' + stars.length +
             ' ' + perc + '%] Star ' + star.id);
-         var do_get_psf = false;
-         if (psfThreshold) {
-            if (psfThresholdFunc) do_get_psf = psfThresholdFunc.call(me, star);
-            else {
-               var j;
-               var thresholdKeys = Object.keys(psfThreshold);
-               var keylen = thresholdKeys.length;
-               for (j = 0; j < keylen; j++) {
-                  var key = thresholdKeys[j];
-                  var val = star[key];
-                  if (!isNaN(val)) {
-                     do_get_psf = (val > psfThreshold[key]);
-                     if (!do_get_psf) break;
-                  }
-               }
-            }
-         } else do_get_psf = true;
+         var do_get_psf = me.shouldDetectPSF(star, psfThreshold);
          var enlargementFactor = 1.2;
          if (star.size >= upLimit) {
             bigStars.push(star);
@@ -435,57 +520,11 @@ StarUtils.prototype = {
          bottom = top + side;
          star.enlargedRect = new Rect(left, top, right, bottom);
          if (do_get_psf) {
-            var psfrows = me.detectPSF(star, lview);
-            var psfmsg = "PSF rows: " + psfrows.length;
-            var psf = null;
-            if (psfrows.length > 0) {
-               psf = psfrows[0];
-               var fwhm;
-               if ((fwhm = psf.FWHMx)) {
-                  var xr = fwhm / star.width;
-                  if (xr >= 1.75) {
-                     console.warningln(
-                        format("WARN: abnormal FWHM to width ratio: %.2f!", xr)+
-                        " DynamicPSF probabily detected two stars, " +
-                        "retrying with automatic aperture diabled..."
-                     );
-                     psf = null;
-                     psfrows = me.detectPSF(star, lview, {autoAperture: false});
-                     if (psfrows.length > 0) psf = psfrows[0];
-                  }
-               }
-            }
-            if (psfrows.length > 0) {
-                  console.noteln(psfmsg);
-                  star.psf = psf;
-                  console.writeln("PSF center=" + star.psf.cx + ',' + star.psf.cy);
-                  console.writeln("Star center=" + star.pos.x + ',' + star.pos.y);
-                  console.writeln("PSF size=" + star.psf.sx + ',' + star.psf.sy);
-                  console.writeln("Star size=" + star.width);
-                  console.writeln("PSF angle=" + star.psf.angle);
-                  Object.keys(star.psf).forEach(function (k) {
-                     var val = star.psf[k];
-                     console.writeln("PSF " + k + " = " + val);
-                     if (!isNaN(val)) {
-                        if (!me.psfValues[k]) me.psfValues[k] = [];
-                        me.psfValues[k].push(val);
-                     }
-                  });
-                  me.starsWithPSF.push(star);
-            } else console.warningln(psfmsg);
+            me.getStarPSFData(star);
          }
          me.updateProgress(i + 1, me.stars.length);
       });
-      /* Update stats with PSF info */
-      var psfAspectRatio = this.psfValues.aspectRatio;
-      if (psfAspectRatio && psfAspectRatio.length > 0){
-         if (!this.stats.psf) this.stats.psf = {};
-         if (!this.stats.psf.aspectRatio) this.stats.psf.aspectRatio = {};
-         this.stats.psf.aspectRatio.min = Math.minElem(psfAspectRatio);
-         this.stats.psf.aspectRatio.max = Math.maxElem(psfAspectRatio);
-         this.stats.psf.aspectRatio.avg = Math.mean(psfAspectRatio);
-         this.stats.psf.aspectRatio.stdDev = Math.stdDev(psfAspectRatio);
-      }
+      this.updatePSFStats();
    },
    createStarImage: function (stars, opts) {
       opts = opts || {};
@@ -1472,8 +1511,12 @@ StarUtils.prototype = {
          var gnuplot = binpath + '/gnuplot';
          if (!File.exists(gnuplot)) gnuplot = binpath + '/gnuplot.exe';
          if(!File.exists(gnuplot)) {
-            console.criticalln("Failed to find gnuplot executable!");
-            return null;
+            console.criticalln("Failed to find gnuplot executable at:");
+            console.criticalln(gnuplot);
+            return {
+               created: false,
+               error: "Unable to find gnuplot executable!"
+            };
          }
          var tmppath = File.systemTempDirectory + '/' +
             File.extractName(gnuplot);
