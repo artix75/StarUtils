@@ -1501,12 +1501,12 @@ StarUtils.prototype = {
             var count = groups[k].length;
             data.push([parseInt(k), count]);
          });
-         xLabel = xLabel || feature;
+         xLabel = xLabel || capitalizedString(feature);
          yLabel = yLabel || 'Count';
       } else {
          data = sorted_data;
          xLabel = xLabel || 'Stars';
-         yLabel = yLabel || feature;
+         yLabel = yLabel || capitalizedString(feature);
       }
       if (!data) return null;
       var writeStatsFile = (data !== sorted_data);

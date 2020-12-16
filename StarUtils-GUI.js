@@ -671,41 +671,31 @@ function StatsDialog(parent) {
    this.__base__(parent);
    var me = this;
 
-   this.getFieldMaxWidth = function (fields) {
-      if (this.fieldMaxWidth !== undefined) return this.fieldMaxWidth;
-      var maxW = 0;
-      fields.forEach(field => {
-         var w = me.font.width(field + ': ');
-         if (w > maxW) maxW = w;
-      });
-      if (maxW === 0) maxW = me.font.width('MMMMMMMMMMM');
-      else this.fieldMaxWidth = maxW;
-      return maxW;
-   };
+   this.statsLabels = {avg: 'mean'};
 
-   this.renderStatsRow = function (sizer, field, value, allLabels) {
+   this.renderStatsRow = function (field, value, parentNode) {
+      field = this.statsLabels[field] || field;
       var name = capitalizedString(field.replace(/_+/g, ' '));
-      var rowsizer = new HorizontalSizer;
-      var fieldLbl = new Label(this);
-      fieldLbl.text = name + ': ';
-      fieldLbl.setFixedWidth(this.getFieldMaxWidth(allLabels));
-      fieldLbl.textAlignment = TextAlign_VertCenter | TextAlign_Right;
-      var valueLbl = new Label(me);
+      var node = new TreeBoxNode;
+      node.setText(0, name + ': ');
+      node.setAlignment(0, Align_Left);
+      var valueLbl;
       if (typeof(value) === 'string' && value.match(/^[\d\.\-\+]+$/))
-         valueLbl.text = format('%.2f', value || 0);
-      else valueLbl.text = '' + value;
-      valueLbl.textAlignment = TextAlign_VertCenter;
-      rowsizer.add(fieldLbl);
-      rowsizer.add(valueLbl);
-      sizer.add(rowsizer);
+         valueLbl = format('%.2f', parseFloat(value) || 0);
+      else if (!isNaN(value)) valueLbl = format('%.2f', parseFloat(value) || 0);
+      else valueLbl = '' + value;
+      node.setText(1, valueLbl);
+      node.setAlignment(1, Align_Right);
+      parentNode.add(node);
    }
 
    this.drawCharts = function () {
       if (!this.starUtils) return;
-      var ungroupedChart = this.starUtils.ungroupedChart;
-      var groupedChart = this.starUtils.groupedChart;
-      if (!ungroupedChart) {
+      var widthChartImage = this.starUtils.widthChartImage;
+      var widthDistChartImage = this.starUtils.widthDistChartImage;
+      if (!widthChartImage) {
          var res = this.starUtils.drawPlot('width', {
+            title: 'Stars by Width',
             drawToWindow: false,
             grouped: false,
             drawPercentageLines: {'25%': true, '50%': true, '75%': true}
@@ -715,17 +705,18 @@ function StatsDialog(parent) {
             return;
          }
          var imageFile = res.imageFile;
-         ungroupedChart = new Bitmap(imageFile);
-         this.starUtils.ungroupedChart = ungroupedChart;
+         widthChartImage = new Bitmap(imageFile);
+         this.starUtils.widthChartImage = widthChartImage;
       }
 
-      this.ungroupedChartImage.setImage(ungroupedChart, {
-         width: ungroupedChart.width,
-         height: ungroupedChart.height
+      this.widthChart.setImage(widthChartImage, {
+         width: widthChartImage.width,
+         height: widthChartImage.height
       });
 
-      if (!groupedChart) {
+      if (!widthDistChartImage) {
          res = this.starUtils.drawPlot('width', {
+            title: 'Star Width Distribution',
             drawToWindow: false,
             grouped: true,
             drawPercentageLines: {'25%': true, '50%': true, '75%': true}
@@ -735,21 +726,19 @@ function StatsDialog(parent) {
             return;
          }
          imageFile = res.imageFile;
-         groupedChart = new Bitmap(imageFile);
-         this.starUtils.groupedChart = groupedChart;
+         widthDistChartImage = new Bitmap(imageFile);
+         this.starUtils.widthDistChartImage = widthDistChartImage;
       }
 
-      this.groupedChartImage.setImage(groupedChart, {
-         width: groupedChart.width,
-         height: groupedChart.height
+      this.widthDistChart.setImage(widthDistChartImage, {
+         width: widthDistChartImage.width,
+         height: widthDistChartImage.height
       });
    }
 
    this.updateStats = function () {
       if (!this.starUtils) return;
       var stats = this.starUtils.stats;
-      var sizer = this.statsBox.viewport.sizer;
-      //console.noteln(JSON.stringify(stats, null, 4));
 
       /* Global Stats */
       var starsWithPSF = this.starUtils.starsWithPSF.length;
@@ -769,62 +758,54 @@ function StatsDialog(parent) {
          });
       });
 
-      var statLabels = Object.keys(globalStats).
-         concat(Object.keys(stats.width));
-
-      var hdrsizer = new HorizontalSizer;
-      var header = new Label(me);
-      header.useRichText = true;
-      header.text = '<b>General</b>';
-      hdrsizer.add(header, 0, Align_Left);
-      sizer.add(hdrsizer);
-
+      this.generalStatsNode = new TreeBoxNode();
+      this.generalStatsNode.setText(0, "General");
       Object.keys(globalStats).forEach(property => {
          var value = globalStats[property];
-         me.renderStatsRow(sizer, property, value, statLabels);
+         me.renderStatsRow(property, value, this.generalStatsNode);
       });
+      this.statsBox.add(this.generalStatsNode);
+      this.generalStatsNode.expanded = true;
 
       ['width', 'flux'].forEach(function (property) {
          var name = capitalizedString(property);
          var dtlStats = stats[property];
-         hdrsizer = new HorizontalSizer;
-         header = new Label(me);
-         header.useRichText = true;
-         header.text = "<b>Star " + name + '</b>';
-         hdrsizer.add(header, 0, Align_Left);
-         sizer.add(hdrsizer);
+         var statsNode = me[property + 'Node'] = new TreeBoxNode();
+         statsNode.setText(0, name);
          Object.keys(dtlStats).forEach(field => {
             var value = dtlStats[field];
-            me.renderStatsRow(sizer, field, value, statLabels);
+            me.renderStatsRow(field, value, statsNode);
          });
+         me.statsBox.add(statsNode);
+         statsNode.expanded = true;
       });
-      this.statsBox.viewport.update();
+      for (i = 0; i < me.statsBox.numberOfColumns; i++) {
+         me.statsBox.adjustColumnWidthToContents(i);
+      }
    };
 
    this.starUtils = parent.starUtils;
-   this.sizer = parent.createHorizontalSizer(this);
-   this.leftSizer = parent.createVerticalSizer(this);
-   this.rightSizer = parent.createVerticalSizer(this);
+   this.sizer = parent.createVerticalSizer(this);
+   this.tabBox = new TabBox(this);
 
-   var previewOpts = {minWidth: 320, minHeight: 266};
-   this.ungroupedChartImage = new PreviewControl(this, previewOpts);
-   this.ungroupedChartImage.setImage(null, {});
-   this.groupedChartImage = new PreviewControl(this, previewOpts);
-   this.groupedChartImage.setImage(null, {});
-   this.leftSizer.add(this.ungroupedChartImage);
-   this.leftSizer.add(this.groupedChartImage);
+   var previewOpts = {minWidth: 640, minHeight: 532};
+   this.widthChart = new PreviewControl(this, previewOpts);
+   this.widthChart.setImage(null, {});
+   this.widthDistChart = new PreviewControl(this, previewOpts);
+   this.widthDistChart.setImage(null, {});
+   this.tabBox.addPage(this.widthChart, 'Stars by width');
+   this.tabBox.addPage(this.widthDistChart, 'Star width distribution');
+   this.sizer.add(this.tabBox);
 
-   this.statsBox = new ScrollBox(this);
+   this.statsBox = new TreeBox(this);
    var par = parent;
    with (this.statsBox) {
-      autoScroll = true;
-      sizer = par.createVerticalSizer(me);
-      viewport.sizer = par.createVerticalSizer(me);
+      headerSorting = false;
+      headerVisible = false;
+      numberOfColumns = 2;
    }
-   this.rightSizer.add(this.statsBox);
-
-   this.sizer.add(this.leftSizer);
-   this.sizer.add(this.rightSizer);
+   this.sizer.add(this.statsBox);
+   this.sizer.addStretch();
 
    this.onExecute = function () {
       me.updateStats();
