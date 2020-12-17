@@ -450,19 +450,32 @@ StarUtils.prototype = {
    },
    recalculatePSF: function (stars, opts) {
       var me = this;
+      var recalculatedStars = [];
       stars = stars || this.stars;
       opts = opts || {};
+      var doUpdateProgress = opts.updateProgress === true;
+      if (doUpdateProgress) {
+         this.setStatus("Calculating PSF");
+         this.updateProgress(0,0);
+      }
       var detectPSFfThreshold = opts.detectPSFThreshold ||
                                 this.opts.detectPSFThreshold;
       var psfThreshold = this.computePSFThreshold(detectPSFfThreshold);
       if (opts.forced) this.psfValues = {};
-      stars.forEach(star => {
-         if (star.psf !== undefined && !opts.forced) return;
+      var tot = stars.length;
+      stars.forEach((star, i) => {
+         if (doUpdateProgress) me.updateProgress(i + 1, tot);
+         if (star.psf && !opts.forced) return;
          if (me.shouldDetectPSF(star, psfThreshold)) {
             me.getStarPSFData(star);
+            if (star.psf) recalculatedStars.push(star);
          }
       });
       this.updatePSFStats();
+      if (doUpdateProgress) {
+         this.setStatus("Done");
+      }
+      return recalculatedStars;
    },
    updatePSFStats: function () {
       /* Update stats with PSF info */

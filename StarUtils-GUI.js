@@ -839,6 +839,135 @@ function StatsDialog(parent) {
 
 StatsDialog.prototype = new Dialog;
 
+function CalculatePSFDialog(parent) {
+   this.__base__ = Dialog;
+   this.__base__(parent);
+   var me = this;
+   this.starUtils = parent.starUtils;
+
+   this.updateStarCount = function () {
+      var count = 0;
+      var onlySelected = me.onlySelectedStarsCheckbox.checked;
+      if (onlySelected) {
+         count = me.parent.starListBox.selectedNodes.length;
+      } else {
+         var stars = me.starUtils.stars.filter(star => !star.psf);
+         var widthThreshold = 0, fluxThreshold = 0;
+         if (me.widthThreshold.enabled) widthThreshold = me.widthThreshold.value;
+         if (me.fluxThreshold.enabled) fluxThreshold  = me.fluxThreshold.value;
+         stars = stars.filter(star => {
+            return star.width > widthThreshold && star.flux > fluxThreshold;
+         });
+         count = stars.length;
+      }
+      var total = count + me.starUtils.starsWithPSF.length;
+      me.psfFoundStarsLabel.text = format('%d star(s) - total: %d',
+         count, total);
+   };
+
+   var stars = this.starUtils.starsWithPSF;
+   var minWidth = null;
+   var minFlux = null;
+   stars.forEach(star => {
+      if (minWidth === null || star.width < minWidth) minWidth = star.width;
+      if (minFlux === null || star.flux < minFlux) minFlux = star.flux;
+   });
+   if (!minWidth) minWidth = this.starUtils.stats.width.min;
+   if (!minFlux) minFlux = this.starUtils.stats.flux.min;
+   var minimums = {width: minWidth, flux: minFlux}
+
+   this.sizer = parent.createVerticalSizer(this);
+   this.thresholdBoxes = [];
+   var onChange = function () {me.updateStarCount()};
+   ['width', 'flux'].forEach(property => {
+      var box = new GroupBox(me);
+      with (box) {
+         title = 'Star ' + capitalizedString(property) + ' Threshold';
+         titleCheckBox = true;
+         sizer = me.parent.createHorizontalSizer(box);
+         var control = me[property + 'Threshold'] = new NumericControl(me);
+         control.setRange(0, minimums[property]);
+         control.setPrecision(2);
+         control.setValue(minimums[property] / 2);
+         sizer.add(control);
+         control.setFixedWidth(me.font.width('MMMMMMMMMMMMMMMMMMMMM'));
+         control.toolTip = "Width threshold for PSF data extraction. " +
+           + capitalizedString(property) + " lower values,\n"+
+           "PSF will be calculated for more stars, but star detection\n"+
+           "will take more time.";
+         control.onValueUpdated = onChange;
+         sizer.addStretch();
+      }
+      box.onCheck = onChange;
+      me.sizer.add(box);
+      me.thresholdBoxes.push(box);
+   });
+
+   var checkBoxSizer = parent.createHorizontalSizer();
+   var onlySelectedCheck = this.onlySelectedStarsCheckbox = new CheckBox(this);
+   onlySelectedCheck.checked = false;
+   onlySelectedCheck.onCheck = function (checked) {
+      me.thresholdBoxes.forEach(box => {
+         box.checked = !checked;
+         box.enabled = !checked;
+      });
+      me.updateStarCount();
+   }
+   onlySelectedCheck.enabled = this.parent.starListBox.selectedNodes.length > 0;
+   var label = new Label;
+   label.text = 'Only for selected stars';
+   checkBoxSizer.add(onlySelectedCheck);
+   checkBoxSizer.add(label, 1, Align_Left);
+   checkBoxSizer.addStretch();
+
+   var infoSizer = parent.createHorizontalSizer();;
+   this.psfFoundStarsLabel = new Label(this);
+   this.psfFoundStarsLabel.textAlignment = TextAlign_Center |
+      TextAlign_VertCenter;
+   this.psfFoundStarsLabel.text = '';
+   infoSizer.add(this.psfFoundStarsLabel);
+
+   var buttonsSizer = parent.createHorizontalSizer();
+   this.calculateButton = new PushButton(this);
+   this.calculateButton.text = 'Calculate PSF';
+   this.calculateButton.icon = this.scaledResource(":/icons/process.png");
+   this.cancelButton = new PushButton(this);
+   this.cancelButton.text = 'Cancel';
+   this.cancelButton.icon = this.scaledResource(":/icons/close.png");
+   this.calculateButton.onClick = function () {
+      me.ok();
+   }
+   this.cancelButton.onClick = function () {
+      me.cancel();
+   }
+   buttonsSizer.add(this.calculateButton);
+   buttonsSizer.add(this.cancelButton);
+
+   this.onReturn = function () {
+      var res = {};
+      if (onlySelectedCheck.checked) res.onlySelected = true;
+      else {
+         res.threshold = {};
+         if (me.widthThreshold.enabled)
+            res.threshold.width = me.widthThreshold.value;
+         if (me.fluxThreshold.enabled)
+            res.threshold.flux = me.fluxThreshold.value;
+      }
+      parent.psfCalcOptions = res;
+   };
+
+   this.sizer.add(checkBoxSizer);
+   this.sizer.add(infoSizer);
+   this.sizer.add(buttonsSizer);
+   this.sizer.addStretch();
+
+   this.updateStarCount();
+   this.windowTitle = "StarUtils PSF Parameters";
+   this.adjustToContents();
+}
+
+CalculatePSFDialog.prototype = new Dialog;
+
 function StarUtilsDialog (options) {
 
    this.__base__ = Dialog;
@@ -928,6 +1057,19 @@ function StarUtilsDialog (options) {
       this.progressBar.updateProgress(progress, tot);
    };
 
+   this.updateFoundStarsLabel = function () {
+      if (!this.starUtils || !this.starsDetected) {
+         this.foundStarsLabel.text = '---';
+         return;
+      }
+      var sd = this.starUtils;
+      var count = sd.stars.length;
+      var withPSFCount = (sd.starsWithPSF || []).length;
+      this.foundStarsLabel.text = format('%d (PSF on: %d%%)',
+         count, Math.round((withPSFCount / count)*100)
+      );
+   };
+
    this.updatePSFStarsLabel = function () {
       var view = this.viewList.currentView;
       if (!view) {
@@ -952,6 +1094,19 @@ function StarUtilsDialog (options) {
       this.psfFoundStarsLabel.text = format('%d star(s)', stars.length);
    }
 
+   this.updateStarListNode = function (node, star) {
+      node.setText(0, star.id);
+      node.setText(1, format('%.2f', star.width));
+      node.setText(2, format('%.2f', star.flux));
+      if (star.psf){
+         node.setText(3, format('%.2f', star.psf.aspectRatio));
+         node.setText(4, format('%.2f', star.psf.angle));
+      } else {
+         node.setText(3,'---');
+         node.setText(4,'---');
+      }
+   };
+
    this.populateStarList = function (stars) {
       this.starListBox.clear();
       if (!stars && this.starUtils) stars = this.starUtils.stars;
@@ -959,24 +1114,38 @@ function StarUtilsDialog (options) {
       var listBox = this.starListBox;
       stars.forEach(star => {
          var node = new TreeBoxNode();
-         node.setText(0, star.id);
-         node.setText(1, format('%.2f', star.width));
-         node.setText(2, format('%.2f', star.flux));
-         if (star.psf){
-            node.setText(3, format('%.2f', star.psf.aspectRatio));
-            node.setText(4, format('%.2f', star.psf.angle));
-         } else {
-            node.setText(3,'---');
-            node.setText(4,'---');
-         }
+         me.updateStarListNode(node, star);
          for (c = 1; c < listBox.numberOfColumns; c++) {
             node.setAlignment(c, Align_Right);
-            listBox.adjustColumnWidthToContents(c);
          }
          node.star = star;
          star.node = node;
          listBox.add(node);
       });
+      for (c = 0; c < listBox.numberOfColumns; c++) {
+         listBox.adjustColumnWidthToContents(c);
+      }
+   };
+
+   this.updateStarList = function (stars) {
+      if (!stars && this.starUtils) stars = this.starUtils.stars;
+      if (!stars) return;
+      var starData = {};
+      stars.forEach(star => {
+         starData[star.id] = star;
+      });
+      var listBox = this.starListBox;
+      var nodeCount = listBox.numberOfChildren, i;
+      for (i = 0; i < nodeCount; i++) {
+         var node = listBox.child(i);
+         if (!node.star) {
+            console.warningln("WARN: starList node " + i + " has no star!");
+            continue;
+         }
+         var star = starData[node.star.id];
+         if (!star) continue;
+         me.updateStarListNode(node, star);
+      }
    };
 
    this.getSelectedStars = function () {
@@ -1206,10 +1375,7 @@ function StarUtilsDialog (options) {
          this.populateStarList(sd.stars);
          this.starsDetected = (sd.stars.length > 0);
          this.imageStars[sd.win.currentView.fullId] = sd.stars;
-         this.foundStarsLabel.text = this.foundStarsLabel.text + ' ' + format(
-            '(PSF on: %d%%)',
-            Math.round((sd.starsWithPSF.length / sd.stars.length)*100)
-         );
+         this.updateFoundStarsLabel();
          this.updateUI();
          this.previewDisplayDetectedStars();
          with (this.previewControl.toggleDetectedStarsBtn) {
@@ -1229,6 +1395,46 @@ function StarUtilsDialog (options) {
          throw e;
       } finally {
 
+      }
+      this.enabled = true;
+   };
+
+   this.calculatePSF = function(opts) {
+      opts = opts || {};
+      var stars = null, threshold = null;
+      if (opts.onlySelected) {
+         stars = this.getSelectedStars();
+         if (stars.length === 0) {
+            this.alert("No stars selected!");
+            return;
+         }
+         stars = stars.filter(star => !star.psf);
+         if (stars.length === 0) {
+            this.alert("Selected stars already have PSF data!");
+            return;
+         }
+         threshold = {width: 0, flux: 0};
+      } else threshold = opts.threshold;
+      if (!stars && (!threshold || Object.keys(threshold).length === 0)) {
+         threshold = {width: 0, flux: 0};
+      }
+      this.enabled = false;
+      try {
+         var recalculatedStars = this.starUtils.recalculatePSF(stars, {
+            detectPSFThreshold: threshold,
+            updateProgress: true,
+         });
+         console.noteln("Recalculated PSF on " + recalculatedStars.length +
+            " star(s)");
+         this.updateFoundStarsLabel();
+         this.updatePSFStarsLabel();
+         this.updateStarList(recalculatedStars);
+         this.updateUI();
+      } catch (e) {
+         me.deleteStarUtils();
+         me.alert("Execution error");
+         me.cancel();
+         throw e;
       }
       this.enabled = true;
    };
@@ -1469,6 +1675,28 @@ function StarUtilsDialog (options) {
       }
    };
 
+   this.showCalculatePSFDialog = function () {
+      try {
+         this.exception = null;
+         this.psfCalcOptions = null;
+         var dialog = new CalculatePSFDialog(this);
+         if (!dialog) return null;
+         var res = dialog.execute();
+         if (this.exception) throw this.exception;
+         if (res === StdDialogCode_Ok) {
+            if (this.psfCalcOptions) {
+               //console.noteln(JSON.stringify(this.psfCalcOptions,null,4));
+               this.calculatePSF(this.psfCalcOptions);
+            }
+         }
+         return dialog;
+      } catch (e) {
+         me.deleteStarUtils();
+         me.cancel();
+         throw(e);
+      }
+   };
+
    this.fixStars = function () {
       var sd = me.starUtils;
       if (!sd || !me.starsDetected) {
@@ -1644,6 +1872,15 @@ function StarUtilsDialog (options) {
    this.selectedStarsCountLabel.text = '';
    starListLabelSizer.add(starListLbl, 0, Align_Left);
    starListLabelSizer.add(this.selectedStarsCountLabel, 1, Align_Left);
+   this.calculatePSFButton = new PushButton(this);
+   this.calculatePSFButton.text = 'Calculate PSF';
+   this.calculatePSFButton.toolTip =
+      "Calculate PSF for stars that are currently missing it";
+   this.calculatePSFButton.onClick = function () {
+      me.showCalculatePSFDialog();
+   };
+   starListLabelSizer.addStretch();
+   starListLabelSizer.add(this.calculatePSFButton, 0, Align_Right);
 
    this.starListBox = new TreeBox(this);
    with (this.starListBox) {
