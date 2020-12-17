@@ -978,10 +978,13 @@ function StarUtilsDialog (options) {
    this.optControls = {};
    this.imageStars = {};
    this.status = null;
+   this.abortRequested = false;
    var me = this;
 
    this.onClose = function (retval) {
+      me.starUtils.abort();
       me.deleteStarUtils();
+      me.abortRequested = true;
    };
 
    this.onShow = function () {
@@ -1734,6 +1737,7 @@ function StarUtilsDialog (options) {
             };
             sd.fixElongatedStars(fixOpts);
          }
+         if (me.abortRequested) return;
          me.progressBar.updateProgress(0, 0);
          if (doReduce) {
             var selection = me.reduceStarsSelection.value;
@@ -1743,6 +1747,7 @@ function StarUtilsDialog (options) {
             };
             sd.reduceStars(null, null, reduceOptions);
          }
+         if (me.abortRequested) return;
          var question = "Star fixing completed. Do you want to rescan image?";
          var msgBox = new MessageBox(question, "StarUtils", StdIcon_Question,
             StdButton_Yes, StdButton_No);
@@ -2210,8 +2215,8 @@ function StarUtilsDialog (options) {
 };
 
 StarUtilsDialog.prototype = new Dialog;
-
 function main() {
+   jsAbortable = true;
    console.abortEnabled = true;
    var dialog = new StarUtilsDialog();
    dialog.restyle();

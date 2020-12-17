@@ -194,10 +194,12 @@ StarUtils.prototype = {
       this.log = {viewId: win.mainView.fullId,
          createdAt: (new Date().toString())};
       this.temporaryWindows = [];
+      this.abortRequested = false;
       this.printHeader("StarUtils initialized");
       this.setStatus('Initialized');
    },
    analyzeStars: function () {
+      var me = this;
       this.printHeader("Analyzing stars...");
       this.setStatus('Analyzing stars');
       var intvl = this.opts.sizeClassInterval || 10;
@@ -209,6 +211,13 @@ StarUtils.prototype = {
          this.temporaryWindows.push(lview.window);
       } else this.luminanceView = this.win.mainView;
       this.setStatus('Detecting stars');
+      this.updateProgress(0,0);
+      this.sd.progressCallback = function (count, tot) {
+         processEvents();
+         me.updateProgress(count, tot);
+         if (me.abortRequested) return false;
+         return true;
+      }
       var stars = this.sd.stars(lview.image);
       var targetArea = this.opts.targetArea;
       if (targetArea) {
@@ -229,7 +238,6 @@ StarUtils.prototype = {
       var widths = [];
       var fluxes = [];
       var sizeClasses = this.sizeClasses = {};
-      var me = this;
       console.writeln("Detecting stars...");
       this.setStatus("Detecting stars");
       this.updateProgress(0, stars.length);
@@ -464,6 +472,8 @@ StarUtils.prototype = {
       if (opts.forced) this.psfValues = {};
       var tot = stars.length;
       stars.forEach((star, i) => {
+         processEvents();
+         if (me.abortRequested) return recalculatedStars;
          if (doUpdateProgress) me.updateProgress(i + 1, tot);
          if (star.psf && !opts.forced) return;
          if (me.shouldDetectPSF(star, psfThreshold)) {
@@ -511,6 +521,8 @@ StarUtils.prototype = {
       this.updateProgress(0,0);
       var me = this;
       stars.forEach(function (star, i) {
+         processEvents();
+         if (me.abortRequested) return;
          var perc = Math.round(((i+1) / stars.length) * 100);
          console.writeln('[' + (i + 1) + '/' + stars.length +
             ' ' + perc + '%] Star ' + star.id);
@@ -1007,6 +1019,9 @@ StarUtils.prototype = {
          star.preview = preview;
          return preview;
    },
+   abort: function () {
+      this.abortRequested = true;
+   },
    fixElongatedStar: function (star, win, opts) {
       opts = opts || {};
       var maxStdDev = opts.maxStdDev || 8;
@@ -1119,6 +1134,8 @@ StarUtils.prototype = {
       this.updateProgress(0,0);
       win.mainView.beginProcess(UndoFlag_NoSwapFile);
       stars.forEach(function (star, i) {
+         processEvents();
+         if (me.abortRequested) return;
          var idx = i + 1;
          var perc = Math.round((idx / len) * 100);
          var logprfx = '[' + idx + '/' + len + ' ' + perc + '%]';
@@ -1198,6 +1215,8 @@ StarUtils.prototype = {
       var processed = 0;
       var processOpts = {processContainer: processContainer};
       Object.keys(groups).forEach(function (structureSize) {
+         processEvents();
+         if (me.abortRequested) return;
          var gstars = groups[structureSize];
          processed += gstars.length;
          var mask = me.createStarMask(gstars, {
