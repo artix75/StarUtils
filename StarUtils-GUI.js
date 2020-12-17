@@ -578,8 +578,8 @@ function PreviewControl(parent, opts) {
       var preview = this.parent.parent;
       var p =  preview.transform(x, y, preview);
       if (!p || isNaN(p.x) || isNaN(p.y)) return;
-      preview.Xval_Label.text = p.x.toString();
-      preview.Yval_Label.text = p.y.toString();
+      preview.Xval_Label.text = Math.round(p.x).toString();
+      preview.Yval_Label.text = Math.round(p.y).toString();
 
       if(preview.onCustomMouseMove) {
          preview.onCustomMouseMove.call(this, p.x, p.y, buttonState, modifiers);
