@@ -176,7 +176,7 @@ StarUtils.prototype = {
     */
    initialize: function (opts) {
       this.opts = opts;
-      opts.verbose = opts.verbose || 1;
+      this.verbose = opts.verbose = 1;
       opts.sizeClassInterval = opts.sizeClassInterval || 10;
       var sd = new StarDetector;
       this.sd = sd;
@@ -200,8 +200,9 @@ StarUtils.prototype = {
    },
    analyzeStars: function () {
       var me = this;
+      var verbose = this.opts.verbose;
       this.printHeader("Analyzing stars...");
-      this.setStatus('Analyzing stars');
+      this.setStatus('Detecting stars');
       var intvl = this.opts.sizeClassInterval || 10;
       var lview = null;
       if (this.srcImage.isColor) {
@@ -210,7 +211,6 @@ StarUtils.prototype = {
          lview.window.hide();
          this.temporaryWindows.push(lview.window);
       } else this.luminanceView = this.win.mainView;
-      this.setStatus('Detecting stars');
       this.updateProgress(0,0);
       this.sd.progressCallback = function (count, tot) {
          processEvents();
@@ -230,6 +230,8 @@ StarUtils.prototype = {
       }
       this.stars = stars;
       this.log.stars = stars;
+      processEvents();
+      if (me.abortRequested) return;
       console.show();
       console.writeln("Found " + stars.length + " star(s)");
       var i = 0;
@@ -238,17 +240,22 @@ StarUtils.prototype = {
       var widths = [];
       var fluxes = [];
       var sizeClasses = this.sizeClasses = {};
-      console.writeln("Detecting stars...");
-      this.setStatus("Detecting stars");
+      console.writeln("Processing stars...");
+      processEvents();
+      this.setStatus("Processing stars");
       this.updateProgress(0, stars.length);
       stars.forEach(function (star) {
-         console.writeln("STAR " + i);
-         me.logStar(star);
+         processEvents();
+         if (me.abortRequested) return;
+         if (verbose > 1) {
+            console.writeln("STAR " + i);
+            me.logStar(star);
+         }
          sizes.push(star.size);
          fluxes.push(star.flux);
          var side = Math.sqrt(star.size);
          widths.push(side);
-         console.writeln(" - Square: " + side + 'x' + side);
+         if (verbose > 1) console.writeln(" - Square: " + side + 'x' + side);
          i++;
          star.width = side;
          var left = star.pos.x - (side / 2);
@@ -263,15 +270,19 @@ StarUtils.prototype = {
          if (!sizeClasses[sizeClass]) sizeClasses[sizeClass] = [];
          sizeClasses[sizeClass].push(star);
          star.sizeClass = sizeClass;
-         console.writeln(' - ID: ' + star.id);
-         console.writeln('------------------');
+         if (verbose > 1) {
+            console.writeln(' - ID: ' + star.id);
+            console.writeln('------------------');
+         }
          me.updateProgress(i, stars.length);
       });
+      processEvents();
+      if (me.abortRequested) return;
       this.sizes = sizes;
       this.fluxes = fluxes;
       this.widths = widths;
       this.calculateStats();
-      if (this.opts.verbose > 1) this.printStats();
+      if (verbose > 1) this.printStats();
       this.setStatus('Done');
    },
    calculateStats: function () {
@@ -438,21 +449,23 @@ StarUtils.prototype = {
          }
       }
       if (psf) {
-         console.noteln(psfmsg);
          star.psf = psf;
-         console.writeln("PSF center=" + star.psf.cx + ',' + star.psf.cy);
-         console.writeln("Star center=" + star.pos.x + ',' + star.pos.y);
-         console.writeln("PSF size=" + star.psf.sx + ',' + star.psf.sy);
-         console.writeln("Star size=" + star.width);
-         console.writeln("PSF angle=" + star.psf.angle);
-         Object.keys(star.psf).forEach(function (k) {
-            var val = star.psf[k];
-            console.writeln("PSF " + k + " = " + val);
-            if (!isNaN(val)) {
-               if (!me.psfValues[k]) me.psfValues[k] = [];
-               me.psfValues[k].push(val);
-            }
-         });
+         if (me.opts.verbose > 1) {
+            console.noteln(psfmsg);
+            console.writeln("PSF center=" + star.psf.cx + ',' + star.psf.cy);
+            console.writeln("Star center=" + star.pos.x + ',' + star.pos.y);
+            console.writeln("PSF size=" + star.psf.sx + ',' + star.psf.sy);
+            console.writeln("Star size=" + star.width);
+            console.writeln("PSF angle=" + star.psf.angle);
+            Object.keys(star.psf).forEach(function (k) {
+               var val = star.psf[k];
+               console.writeln("PSF " + k + " = " + val);
+               if (!isNaN(val)) {
+                  if (!me.psfValues[k]) me.psfValues[k] = [];
+                  me.psfValues[k].push(val);
+               }
+            });
+         }
          me.starsWithPSF.push(star);
       } else console.warningln(psfmsg);
    },
@@ -501,6 +514,7 @@ StarUtils.prototype = {
    },
    classifyStars: function () {
       this.printHeader("Classifing stars...");
+      var verbose = this.opts.verbose;
       var bigStars = this.bigStars = [];
       var averageStars = this.averageStars = [];
       var smallStars = this.smallStars = [];
@@ -524,8 +538,10 @@ StarUtils.prototype = {
          processEvents();
          if (me.abortRequested) return;
          var perc = Math.round(((i+1) / stars.length) * 100);
-         console.writeln('[' + (i + 1) + '/' + stars.length +
-            ' ' + perc + '%] Star ' + star.id);
+         if (verbose > 1) {
+            console.writeln('[' + (i + 1) + '/' + stars.length +
+               ' ' + perc + '%] Star ' + star.id);
+         }
          var do_get_psf = me.shouldDetectPSF(star, psfThreshold);
          var enlargementFactor = 1.2;
          if (star.size >= upLimit) {
@@ -1062,12 +1078,14 @@ StarUtils.prototype = {
       var sx = psf.sx;
       var stdDev = sx;
       if (stdDev > maxStdDev) stdDev = maxStdDev;
+      var motionLength = sx * fixLen;
+      if (motionLength > 100) motionLength = 100;
       var deringingDark = (stdDev * deringingScale) / 1000;
       console.writeln("Fix elongated star " + star.id + ", StdDev: " + stdDev +
          ", Angle: " + psf.angle);
       var processOpts = {processContainer: processContainer};
       this.convolution(view, stdDev, processOpts);
-      this.motionDeconvolution(view, sx * fixLen, psf.angle, processOpts);
+      this.motionDeconvolution(view, motionLength, psf.angle, processOpts);
       this.deconvolution(view, stdDev, {
             deringing: deringing,
             deringingDark: deringingDark,
@@ -1087,7 +1105,7 @@ StarUtils.prototype = {
          if (!this.log.fixElongatedStar) this.log.fixElongatedStar = {}
          this.log.fixElongatedStar[star.id] = {
             convolution: {stdDev: stdDev},
-            motionDeconvolution: {len: sx * fixLen, angle: psf.angle},
+            motionDeconvolution: {len: motionLength, angle: psf.angle},
             deconvolution: {stdDev: stdDev, deringing: deringing,
                             deringingDark: deringingDark},
             mask: {
@@ -1156,6 +1174,7 @@ StarUtils.prototype = {
          console.note(' Fixing elongated star '+ star.id);
          console.noteln(' (' + r + ')');
          me.fixElongatedStar(star, win, opts);
+         gc(false);
       });
       win.mainView.endProcess();
       if (win != origWin) {

@@ -978,13 +978,17 @@ function StarUtilsDialog (options) {
    this.optControls = {};
    this.imageStars = {};
    this.status = null;
+   this.detecting = false;
    this.abortRequested = false;
    var me = this;
 
    this.onClose = function (retval) {
-      me.starUtils.abort();
-      me.deleteStarUtils();
+      if (me.starUtils) {
+         me.starUtils.abort();
+         me.deleteStarUtils();
+      }
       me.abortRequested = true;
+      console.hide();
    };
 
    this.onShow = function () {
@@ -1047,6 +1051,8 @@ function StarUtilsDialog (options) {
 
    this.onStatusUpdate = function (status) {
       console.writeln("Status: " + status);
+      this.status = status;
+      this.detecting = (status.toLowerCase() === 'detecting stars');
       if (status) status = '<b>' + status + '</b>';
       this.statusLabel.text = status || '---';
    }
@@ -1056,7 +1062,10 @@ function StarUtilsDialog (options) {
          this.progressLabel.text = '';
          return;
       }
-      this.progressLabel.text = progress + '/' + tot;
+      if (!this.detecting)
+         this.progressLabel.text = progress + '/' + tot;
+      else
+         this.progressLabel.text = '';
       this.progressBar.updateProgress(progress, tot);
    };
 
@@ -1369,11 +1378,13 @@ function StarUtilsDialog (options) {
       this.enabled = false;
       try {
          sd.analyzeStars();
+         if (me.abortRequested) return;
          this.foundStarsLabel.text = '' + sd.stars.length;
          sd.setLimits();
          sd.classifyStars();
          this.onStatusUpdate('Done');
          this.onProgressUpdate(0,0);
+         if (me.abortRequested) return;
          this.resetButton.enabled = true;
          this.populateStarList(sd.stars);
          this.starsDetected = (sd.stars.length > 0);
