@@ -1117,6 +1117,21 @@ function StarUtilsDialog (options) {
          node.setText(3,'---');
          node.setText(4,'---');
       }
+      var tooltip = ['x', 'y'].map(prop => {
+         var lbl = padString(prop.toUpperCase() + ':', 3);
+         return format('<b>%s</b> %.2f', lbl, star.pos[prop]);
+      }).join("<br>");
+      if (star.psf) {
+         tooltip += "<br><br><b>PSF</b><br><br>";
+         tooltip += ['cx', 'cy', 'sx', 'sy', 'FWHMx', 'FWHMy'].map(prop => {
+            var lbl = padString(prop + ':', 6);
+            return format('<b>%s</b> %.2f', lbl, star.psf[prop]);
+         }).join("<br>");
+      }
+      tooltip +=
+      '<br><br><i>Click to select, double click to zoom on star</i>';
+      for (let i = 0; i < 5; i++)
+         node.setToolTip(i, tooltip);
    };
 
    this.populateStarList = function (stars) {

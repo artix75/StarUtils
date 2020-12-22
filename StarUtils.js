@@ -22,6 +22,9 @@
 #include <pjsr/FileMode.jsh>
 #include <pjsr/DataType.jsh>
 
+#define STRING_PAD_LEFT  1
+#define STRING_PAD_RIGHT 2
+
 var MorphologicalTransformationMasks = {
    5: [
       0x00,0x01,0x01,0x01,0x00,
@@ -108,6 +111,18 @@ function consoleFormattedString(string, style) {
 
 function capitalizedString(str) {
    return str.charAt(0).toUpperCase() + str.substr(1);
+}
+
+function padString(str, len, direction, character) {
+   var curlen = str.length;
+   len -= curlen;
+   if (len <= 0) return str;
+   character = character || ' ';
+   var pad = character.repeat(len);
+   direction = direction || STRING_PAD_RIGHT;
+   if (direction === STRING_PAD_RIGHT) str = str + pad;
+   else if (direction === STRING_PAD_LEFT) str = pad + str;
+   return str;
 }
 
 function getTimeStamp(date, sep) {
