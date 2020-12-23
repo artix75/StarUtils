@@ -1196,7 +1196,7 @@ function StarUtilsDialog (options) {
       opts = opts || {};
       if (!this.starUtils || !this.starsDetected) return;
       this.setPreviewImage(this.starUtils.stars, {
-         color: 0xaa0099bb,
+         color: 0xff0099bb,
          bitmapID: 'detectedStars',
          zoom: opts.zoom
       });

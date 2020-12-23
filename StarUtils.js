@@ -1515,6 +1515,8 @@ StarUtils.prototype = {
       var win = opts.win || this.win;
       if (!this.annotatedWindows) this.annotatedWindows = [];
       var color = opts.color || 0xff00ff00;
+      var psfColor = opts.psfColor || color;
+      var crossAirColor = opts.psfCrossAirColor || 0xff660066;
       var penWidth = opts.penWidth || 1;
       var bmp = this.getWindowBmp(win);
       var g = new VectorGraphics(bmp);
@@ -1529,11 +1531,36 @@ StarUtils.prototype = {
          g.pen = new Pen(style.color, style.penWidth,
             PenStyle_Solid, PenCap_Round);
          g.drawRect(r);
-         if (style.drawText === false) return;
-         var txt = style.text || star.id;
-         var txt_at = new Point(r.x0, r.bottom + 15);
-         if (txt_at.y >= win.mainView.image.height) txt_at.y = r.top - 35;
-         g.drawText(txt_at, txt);
+         if (style.drawPSF !== false && star.psf) {
+            g.transformationEnabled = true;
+            let w = star.psf.FWHMx, h = star.psf.FWHMy,
+                x = star.psf.cx, y = star.psf.cy,
+                crossair_size = (star.psf.sx / 2);
+            var ellipseRect = new Rect(-w/2, -h/2, w/2, h/2);
+            g.pushState();
+            if (psfColor !== color) {
+               g.pen = new Pen(psfColor, style.penWidth,
+                  PenStyle_Solid, PenCap_Round);
+            }
+            g.translateTransformation(x, y);
+            g.rotateTransformation((star.psf.angle || 0) * Math.PI / 180);
+            g.drawEllipse(ellipseRect);
+            /* Draw Centroid Cross-air */
+            g.pushState();
+            g.pen = new Pen(crossAirColor, style.penWidth,
+               PenStyle_Solid, PenCap_Round);
+            g.drawLine(-crossair_size, 0, crossair_size, 0);
+            g.drawLine(0, -crossair_size, 0, crossair_size);
+            g.popState();
+            g.resetTransformation();
+            g.popState();
+         }
+         if (style.drawText !== false) {
+            var txt = style.text || star.id;
+            var txt_at = new Point(r.x0, r.bottom + 15);
+            if (txt_at.y >= win.mainView.image.height) txt_at.y = r.top - 35;
+            g.drawText(txt_at, txt);
+         }
       });
       g.end();
       if (opts.returnBitmap) return bmp;
