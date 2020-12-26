@@ -153,7 +153,7 @@ function FWHM(func, sigma, beta, varshape) {
          return 0.6016900619596693 * sigma;
        case DynamicPSF.prototype.Function_Moffat6:
          return 0.6998915581984769 * sigma;
-       case DynamicPSF.prototype.Function_Moffat:
+       case DynamicPSF.prototype.Function_Moffat4:
           return 0.8699588840921645 * sigma;
        case DynamicPSF.prototype.Function_Moffat25:
           return 1.1305006161394060 * sigma;
@@ -162,6 +162,30 @@ function FWHM(func, sigma, beta, varshape) {
        case DynamicPSF.prototype.Function_Lorentzian:
           return 2 * sigma;
        default: return 0; // ?!
+   }
+}
+
+function PSFFunctionName(func) {
+   switch (func) {
+       case DynamicPSF.prototype.Function_Gaussian:
+         return "Gaussian";
+       case DynamicPSF.prototype.Function_Moffat:
+         return "Moffat";
+       case DynamicPSF.prototype.Function_Moffat10:
+         return "Moffat10";
+       case DynamicPSF.prototype.Function_Moffat8:
+         return "Moffat8";
+       case DynamicPSF.prototype.Function_Moffat6:
+         return "Moffat6";
+       case DynamicPSF.prototype.Function_Moffat4:
+          return "Moffat4";
+       case DynamicPSF.prototype.Function_Moffat25:
+          return "Moffat25";
+       case DynamicPSF.prototype.Function_Moffat15:
+          return "Moffat15";
+       case DynamicPSF.prototype.Function_Lorentzian:
+          return "Lorentzian";
+       default: return "";
    }
 }
 
@@ -453,9 +477,10 @@ StarUtils.prototype = {
             var xr = fwhm / star.width;
             if (xr >= 1.75) {
                console.warningln(
-                  format("WARN: abnormal FWHM to width ratio: %.2f!", xr)+
+                  format("WARN (%s): abnormal FWHM to width ratio: %.2f!",
+                     star.id, xr) +
                   " DynamicPSF probabily detected two stars, " +
-                  "retrying with automatic aperture diabled..."
+                  "retrying with automatic aperture disabled..."
                );
                psf = null;
                psfrows = this.detectPSF(star, lview, {autoAperture: false});
@@ -1055,20 +1080,20 @@ StarUtils.prototype = {
    },
    fixElongatedStar: function (star, win, opts) {
       opts = opts || {};
+      win = win || this.win;
+      var view = win.mainView;
       var maxStdDev = opts.maxStdDev || 8;
       var deringing = (opts.deringing !== false);
       var deringingScale = opts.deringingScale || 1;
       var fixFactor = opts.fixFactor || 1;
       var processContainer = opts.processContainer;
-      var fixLen = 2 * fixFactor;
       var psf = star.psf;
       if (!psf) {
          console.warningln("Cannot fix elongated star " + star.id +
             ": Missing PSF");
          return;
       }
-      win = win || this.win;
-      var view = win.mainView;
+      var fixLen = 1.5 * (1 / psf.aspectRatio) * fixFactor;
       var structSize = 5;
       if (star.width >= 9) structSize = 9;
       else if (star.width >= 7) structSize = 7;
@@ -1091,6 +1116,17 @@ StarUtils.prototype = {
       win.maskVisible = false;
       win.setMask(mask);
       var sx = psf.sx;
+      if (psf.FWHMx && sx) {
+         /* With some PSF functions (ie. Moffat functions), sx could be too
+          * high. We generally assume that sx is a good measure for
+          * deconvolution length and/or stddev onyl when FWHM is about two
+          * times bigger than sx. */
+         let xr = psf.FWHMx / sx;
+         if (Math.round(xr) < 2) {
+            if (xr > 1) xr = (1 / xr);
+            sx /= (2 * xr);
+         }
+      }
       var stdDev = sx;
       if (stdDev > maxStdDev) stdDev = maxStdDev;
       var motionLength = sx * fixLen;
