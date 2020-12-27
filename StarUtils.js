@@ -109,7 +109,9 @@ function consoleFormattedString(string, style) {
    return string;
 }
 
-function capitalizedString(str) {
+function capitalizedString(str, capitalize_words) {
+   if (capitalize_words === true)
+      return str.split(/\s+/).map(w => capitalizedString(w)).join(' ');
    return str.charAt(0).toUpperCase() + str.substr(1);
 }
 
@@ -386,8 +388,22 @@ StarUtils.prototype = {
       if (!this.sortedStars) this.sortedStars = {};
       var sorted = this.sortedStars[feature];
       if (!sorted) {
-         sorted = this.stars.map(star => star).
-            sort((a, b) => {return a[feature] - b[feature]});
+         var objName = null, property = feature;
+         if (feature.indexOf('.') > 0) {
+            var components = feature.split('.');
+            objName = components[0];
+            property = components[1];
+            sorted = this.stars.filter(star => {
+               return star[objName] !== undefined;
+            }).map(star => star);
+         } else sorted = this.stars.map(star => star);
+         sorted = sorted.sort((a, b) => {
+            if (objName) {
+               a = a[objName];
+               b = b[objName];
+            }
+            return a[property] - b[property];
+         });
          this.sortedStars[feature] = sorted;
       }
       return sorted;
@@ -401,8 +417,16 @@ StarUtils.prototype = {
       if (grouped) return grouped;
       var sorted = this.sortStarsBy(feature);
       grouped = {};
+      if (sorted.length === 0) return grouped;
+      var objName = null, property = feature;
+      if (feature.indexOf('.') > 0) {
+         var components = feature.split('.');
+         objName = components[0];
+         property = components[1];
+      }
       sorted.forEach((star, i) => {
-         var val = star[feature];
+         var obj = (objName ? star[objName] : star);
+         var val = obj[property];
          var grp = Math.round(val / interval) * interval;
          if (!grouped[grp]) grouped[grp] = [];
          grouped[grp].push(star);
@@ -1639,9 +1663,9 @@ StarUtils.prototype = {
          var binpath = coreBinDirPath;
          var gnuplot = binpath + '/gnuplot';
          if (!File.exists(gnuplot)) gnuplot = binpath + '/gnuplot.exe';
-         if(!File.exists(gnuplot)) {
-            console.criticalln("Failed to find gnuplot executable at:");
-            console.criticalln(gnuplot);
+         if (!File.exists(gnuplot)) {
+            console.criticalln("Failed to find gnuplot executable in:");
+            console.criticalln(File.extractDirectory(gnuplot));
             return {
                created: false,
                error: "Unable to find gnuplot executable!"
@@ -1653,9 +1677,27 @@ StarUtils.prototype = {
          gnuplotExe = this.gnuplotExecutable = tmppath;
       }
       var data = null;
+      var featureName = feature.toLowerCase().replace(/\.+/g, '_');
+      var objName = null, property = feature;
+      if (feature.indexOf('.') > 0) {
+         var components = feature.split('.');
+         objName = components[0];
+         property = components[1];
+      }
       var sorted = this.sortStarsBy(feature);
+      if (sorted.length === 0) {
+         console.warningln("drawPlot: no data found for " + feature);
+         return {
+            created: false,
+            error: "No data"
+         };
+      }
       var sorted_data = [];
-      sorted.forEach((star, i) => {sorted_data.push([i, star[feature]])});
+      sorted.forEach((star, i) => {
+         var value =
+            (objName ? (star[objName] || {})[property] : star[feature]);
+         sorted_data.push([i, value]);
+      });
       var xLabel = opts.xLabel;
       var yLabel = opts.yLabel;
       var grouped = opts.grouped;
@@ -1668,10 +1710,21 @@ StarUtils.prototype = {
          }
          var groups = this.groupStars(feature, grpOpts);
          var keys = Object.keys(groups).sort((a, b) => {return a - b});
+         if (keys.length === 0) {
+            console.warningln("drawPlot: no groups for " + feature);
+            return {
+               created: false,
+               error: "No groups"
+            };
+         };
          data = [];
          keys.forEach((k) => {
             var count = groups[k].length;
-            data.push([parseInt(k), count]);
+            var fmt = '%.2f';
+            k = parseFloat(k);
+            if ((k % parseInt(k)) === 0) fmt = '%d';
+            k = format(fmt, k);
+            data.push([k, count]);
          });
          xLabel = xLabel || capitalizedString(feature);
          yLabel = yLabel || 'Count';
@@ -1683,14 +1736,15 @@ StarUtils.prototype = {
       if (!data) return null;
       var writeStatsFile = (data !== sorted_data);
       data = data.map(values => values.join(' ')).join("\n");
-      var dataFile = this.getTempFile('stars_' + feature + '.dat');
+      var dataFile = this.getTempFile('stars_' + featureName + '.dat');
       var statsDataFile = dataFile;
-      var scriptFile = this.getTempFile('stars_' + feature + '.plt');
+      var scriptFile = this.getTempFile('stars_' + featureName + '.plt');
       var statColumn = 2;
       File.writeTextFile(dataFile, data);
       if (writeStatsFile) {
          sorted_data = sorted_data.map(values => values.join(' ')).join("\n");
-         statsDataFile = this.getTempFile('stars_' + feature + '.values.dat');
+         statsDataFile =
+            this.getTempFile('stars_' + featureName + '.values.dat');
          File.writeTextFile(statsDataFile, sorted_data);
          //statColumn = 1;
       }
@@ -1701,7 +1755,7 @@ StarUtils.prototype = {
       var fontName = font.name || 'Helvetica';
       var fontSize = font.size || 10;
       var imageFile = opts.imageFile ||
-         this.getTempFile("star_" + feature + "_graph.svg");
+         this.getTempFile("star_" + featureName + "_graph.svg");
       var title = opts.title ||
          ("Star " + feature + (grouped ? ' (Grouped)' : ''));
       var script = ["set terminal svg size " + width + ',' + height +
@@ -1715,7 +1769,7 @@ StarUtils.prototype = {
       script.push('set ylabel "' + yLabel + '"');
       if (xtic) script.push('set xtic ' + xtic);
       script.push('stats "' + statsDataFile + '" using ' + statColumn +
-         ' output name "' + feature + '"');
+         ' output name "' + featureName + '"');
       var vars = [['stddev_high', '$mean + $stddev'],
                   ['stddev_low', '$mean - $stddev']];
       var statLineVars = ['mean'];
@@ -1723,8 +1777,8 @@ StarUtils.prototype = {
          var varname = vardef[0];
          var expr = vardef[1];
          statLineVars.push(varname);
-         expr = expr.replace(/\$/g, feature + '_');
-         script.push(feature + '_' + varname + ' = ' + expr);
+         expr = expr.replace(/\$/g, featureName + '_');
+         script.push(featureName + '_' + varname + ' = ' + expr);
       });
       /* Draw statistical lines */
       var varCount = 0;
@@ -1734,7 +1788,7 @@ StarUtils.prototype = {
          var label = null;
          if (varname.indexOf('stddev_') === 0) label = 'σ';
          label = label || capitalizedString(varname);
-         varname = feature + '_' + varname;
+         varname = featureName + '_' + varname;
          if (grouped) {
             script.push('set arrow ' + (i+1) + ' from ' + varname +
                ', graph 0.0 to ' + varname + ', graph 1.0 nohead fill lc \'' +
@@ -1751,8 +1805,8 @@ StarUtils.prototype = {
          varCount = i + 1;
       });
       if (opts.drawStdDevBackground !== false) {
-         var lowvar = feature + '_stddev_low';
-         var highvar = feature + '_stddev_high';
+         var lowvar = featureName + '_stddev_low';
+         var highvar = featureName + '_stddev_high';
          if (grouped) {
             script.push("set obj rect from " + lowvar + ", graph 0 to " +
                         highvar + ", graph 1 lw 0 lc '#000000' fc '#cccccc'");
@@ -1775,12 +1829,15 @@ StarUtils.prototype = {
             if (!color) {
                if (percentage === 0.5) color = '#00aa00';
                else if (percentage > 0.5) color = '#00aaf0';
-               else color = '#cc00cc';
+               else color = '#e48a41';
             }
             var label = Math.round(percentage * 100) + '%';
-            var varname = feature + '_' + Math.round(percentage * 100);
-            script.push(varname + ' = ((' + feature + '_max - ' + feature +
-               '_min) * ' + percentage +') + ' + feature + '_min');
+            var varname = featureName + '_' + Math.round(percentage * 100);
+            script.push(
+               varname + ' = ((' + featureName + '_max - ' +
+               featureName + '_min) * ' + percentage +') + ' +
+               featureName + '_min'
+            );
             varCount++;
             if (grouped) {
                script.push("set arrow " + varCount + " from " + varname +
@@ -1800,14 +1857,15 @@ StarUtils.prototype = {
          });
       };
       console.noteln("Feature: " + feature);
-      var featName = capitalizedString(feature);
+      var plotTile = capitalizedString(featureName.replace(/_+/g, ' '), true);
       var plots = ['plot "' + dataFile + '" with lines smooth csplines ' +
-         'title "' + featName + '"'];
+         'title "' + plotTile + '"'];
       plots = plots.join(",\\\n");
       script.push(plots);
       script = script.join("\n");
       File.writeTextFile(scriptFile, script);
-      var outputPath = this.getTempFile('stars_' + feature + '.log');
+      var outputPath = this.getTempFile('stars_' + featureName + '.log');
+      var err = null, code = null, status = null;
       var P = new ExternalProcess();
       with (P) {
          workingDirectory = File.systemTempDirectory;
@@ -1818,13 +1876,16 @@ StarUtils.prototype = {
             Console.writeln("Start " + gnuplotExe);
          }
 
-         onError = function( errorCode ) {
+         onError = function(errorCode) {
+            err = errorCode;
             Console.criticalln("Error #" + errorCode);
          }
 
-         onFinished = function( exitCode, exitStatus ) {
-            Console.writeln("End Exit code " + exitCode + '\t' +
-                            ", Status " + exitStatus);
+         onFinished = function(exitCode, exitStatus) {
+            code = exitCode;
+            status = exitStatus;
+            Console.writeln("End Exit code = " + exitCode + ', ' +
+                            "Status = " + exitStatus);
          }
 
          start(gnuplotExe);
@@ -1841,7 +1902,7 @@ StarUtils.prototype = {
          try {
             var bm = new Bitmap(imageFile);
             var window = new ImageWindow(bm.width, bm.height, 3, 32, true, true,
-               "Stars_" + feature + "_Plot");
+               "Stars_" + featureName + "_Plot");
             window.mainView.beginProcess(UndoFlag_NoSwapFile);
             window.mainView.image.blend(bm);
             window.mainView.endProcess();
@@ -1851,7 +1912,7 @@ StarUtils.prototype = {
          }
       }
       return {imageFile: imageFile, log: outputPath, script: scriptFile,
-         created: created};
+         created: created, errorCode: err, exitCode: code};
    },
    closeTemporaryWindows: function () {
       var lwin = this.luminanceView.window;

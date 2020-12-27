@@ -673,6 +673,8 @@ function StatsDialog(parent) {
    var me = this;
 
    this.statsLabels = {avg: 'mean'};
+   this.charts = parent.charts = {};
+   this.chartProperty = 'width';
 
    this.renderStatsRow = function (field, value, parentNode) {
       field = this.statsLabels[field] || field;
@@ -692,51 +694,64 @@ function StatsDialog(parent) {
 
    this.drawCharts = function () {
       if (!this.starUtils) return;
-      var widthChartImage = this.starUtils.widthChartImage;
-      var widthDistChartImage = this.starUtils.widthDistChartImage;
-      if (!widthChartImage) {
-         var res = this.starUtils.drawPlot('width', {
-            title: 'Stars by Width',
+      var prop = this.chartProperty;
+      var lbl = this.chartPropertyLabel || prop;
+      var chartImages = this.charts[prop];
+      if (!chartImages) chartImages = this.charts[prop] = {};
+      var chartImage = chartImages.defaultChart;
+      var distChartImage = chartImages.distChart;
+      if (!chartImage) {
+         var res = this.starUtils.drawPlot(prop, {
+            title: 'Stars by ' + lbl,
             drawToWindow: false,
             grouped: false,
+            yLabel: lbl,
             drawPercentageLines: {'25%': true, '50%': true, '75%': true}
          });
-         if (!res || !res.created) {
+         if (!res || !res.created || res.exitCode) {
             var err = "Failed to create charts!";
             if (res.error) err += "\n" + res.error;
             parent.alert(err);
             return;
          }
          var imageFile = res.imageFile;
-         widthChartImage = new Bitmap(imageFile);
-         this.starUtils.widthChartImage = widthChartImage;
+         chartImage = new Bitmap(imageFile);
+         chartImages.defaultChart = chartImage;
       }
 
-      this.widthChart.setImage(widthChartImage, {
-         width: widthChartImage.width,
-         height: widthChartImage.height
+      this.defaultChart.setImage(chartImage, {
+         width: chartImage.width,
+         height: chartImage.height
       });
 
-      if (!widthDistChartImage) {
-         res = this.starUtils.drawPlot('width', {
-            title: 'Star Width Distribution',
+      if (!distChartImage) {
+         var intervals = {
+            width: 2,
+            flux: 20,
+            'psf.aspectRatio': 0.02,
+         };
+         res = this.starUtils.drawPlot(prop, {
+            title: 'Star ' + lbl + ' Distribution',
             drawToWindow: false,
-            grouped: true,
+            grouped: intervals[prop] || 2,
+            xLabel: lbl,
             drawPercentageLines: {'25%': true, '50%': true, '75%': true}
          });
-         if (!res.created) {
+         if (!res || !res.created || res.exitCode) {
             parent.alert("Failed to create charts!");
             return;
          }
          imageFile = res.imageFile;
-         widthDistChartImage = new Bitmap(imageFile);
-         this.starUtils.widthDistChartImage = widthDistChartImage;
+         distChartImage = new Bitmap(imageFile);
+         chartImages.distChart = distChartImage;
       }
 
-      this.widthDistChart.setImage(widthDistChartImage, {
-         width: widthDistChartImage.width,
-         height: widthDistChartImage.height
+      this.distChart.setImage(distChartImage, {
+         width: distChartImage.width,
+         height: distChartImage.height
       });
+      this.tabBox.setPageLabel(0, 'Stars by ' + lbl);
+      this.tabBox.setPageLabel(1, 'Star ' + lbl + ' distribution');
    }
 
    this.updateStats = function () {
@@ -788,16 +803,41 @@ function StatsDialog(parent) {
    };
 
    this.starUtils = parent.starUtils;
-   this.sizer = parent.createVerticalSizer(this);
-   this.tabBox = new TabBox(this);
-
    var previewOpts = {minWidth: 640, minHeight: 532};
-   this.widthChart = new PreviewControl(this, previewOpts);
-   this.widthChart.setImage(null, {});
-   this.widthDistChart = new PreviewControl(this, previewOpts);
-   this.widthDistChart.setImage(null, {});
-   this.tabBox.addPage(this.widthChart, 'Stars by width');
-   this.tabBox.addPage(this.widthDistChart, 'Star width distribution');
+   this.chartProperties = ['width', 'flux'];
+   if (this.starUtils.starsWithPSF.length > 0)
+      this.chartProperties.push('psf.aspectRatio');
+   this.sizer = parent.createVerticalSizer(this);
+
+   var optionsSizer = parent.createHorizontalSizer(this);
+   this.chartPropertySelector = new ComboBox(this);
+   this.chartProperties.forEach(prop => {
+      var lbl = prop;
+      if (lbl.indexOf('.') >= 0) lbl = lbl.split('.')[1];
+      lbl = lbl.replace(/([A-Z])/g, ' $1');
+      lbl = capitalizedString(lbl, true);
+      me.chartPropertySelector.addItem(lbl);
+   });
+   this.chartPropertySelector.onItemSelected = function (idx) {
+      me.chartProperty = me.chartProperties[idx];
+      me.chartPropertyLabel = me.chartPropertySelector.itemText(idx);
+      me.drawCharts();
+   };
+   var lbl = new Label(this);
+   lbl.text = 'Chart Property: ';
+   lbl.textAlignment = TextAlign_Right|TextAlign_VertCenter;
+   optionsSizer.add(lbl);
+   optionsSizer.add(this.chartPropertySelector);
+   optionsSizer.addStretch();
+   this.sizer.add(optionsSizer);
+
+   this.tabBox = new TabBox(this);
+   this.defaultChart = new PreviewControl(this, previewOpts);
+   this.defaultChart.setImage(null, {});
+   this.distChart = new PreviewControl(this, previewOpts);
+   this.distChart.setImage(null, {});
+   this.tabBox.addPage(this.defaultChart, 'Stars by width');
+   this.tabBox.addPage(this.distChart, 'Star width distribution');
    this.sizer.add(this.tabBox);
 
    this.statsBox = new TreeBox(this);
