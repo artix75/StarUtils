@@ -514,22 +514,23 @@ StarUtils.prototype = {
       }
       if (psf) {
          star.psf = psf;
-         if (me.opts.verbose > 1) {
+         var doLog = (me.opts.verbose > 1);
+         if (doLog) {
             console.noteln(psfmsg);
             console.writeln("PSF center=" + star.psf.cx + ',' + star.psf.cy);
             console.writeln("Star center=" + star.pos.x + ',' + star.pos.y);
             console.writeln("PSF size=" + star.psf.sx + ',' + star.psf.sy);
             console.writeln("Star size=" + star.width);
             console.writeln("PSF angle=" + star.psf.angle);
-            Object.keys(star.psf).forEach(function (k) {
-               var val = star.psf[k];
-               console.writeln("PSF " + k + " = " + val);
-               if (!isNaN(val)) {
-                  if (!me.psfValues[k]) me.psfValues[k] = [];
-                  me.psfValues[k].push(val);
-               }
-            });
          }
+         Object.keys(star.psf).forEach(function (k) {
+            var val = star.psf[k];
+            if (doLog) console.writeln("PSF " + k + " = " + val);
+            if (!isNaN(val)) {
+               if (!me.psfValues[k]) me.psfValues[k] = [];
+               me.psfValues[k].push(val);
+            }
+         });
          me.starsWithPSF.push(star);
       } else console.warningln(psfmsg);
    },
