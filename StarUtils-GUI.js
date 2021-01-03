@@ -230,7 +230,107 @@ var StarUtilsUI = {
          tip: "Create a ProcessContainer instance containing all processes\n"+
               "applied to fix stars",
       },
-   ]
+   ],
+   filterStarsDialog: [
+      {
+         label: 'Star Width',
+         propertyName: 'filterStarsWidth',
+         type: GroupBox,
+         checkbox: true,
+         checked: false,
+         sizerType: VerticalSizer,
+         //stretch: true,
+         onCheck: 'updateSelectedStars',
+         children: [
+            {
+               label: 'Min',
+               propertyName: 'filterStarsMinWidth',
+               statsField: 'width.min',
+               type: NumericControl,
+               format: '%d%%',
+               tip: "Minimum width of stars to be selected.",
+               //stretch: true,
+               onValueUpdated: 'updateSelectedStars',
+            },
+            {
+               label: 'Max',
+               statsField: 'width.max',
+               propertyName: 'filterStarsMaxWidth',
+               type: NumericControl,
+               format: '%d%%',
+               tip: "Maximum width of stars to be selected.",
+               //stretch: true,
+               onValueUpdated: 'updateSelectedStars',
+            },
+         ]
+      },
+      {
+         label: 'Star Flux',
+         propertyName: 'filterStarsFlux',
+         type: GroupBox,
+         checkbox: true,
+         checked: false,
+         sizerType: VerticalSizer,
+         stretch: true,
+         onCheck: 'updateSelectedStars',
+         children: [
+            {
+               label: 'Min',
+               propertyName: 'filterStarsMinFlux',
+               statsField: 'flux.min',
+               type: NumericControl,
+               format: '%d%%',
+               tip: "Minimum flux of stars to be selected.",
+               //stretch: true,
+               onValueUpdated: 'updateSelectedStars',
+            },
+            {
+               label: 'Max',
+               statsField: 'flux.max',
+               propertyName: 'filterStarsMaxFlux',
+               type: NumericControl,
+               format: '%d%%',
+               tip: "Maximum flux of stars to be selected.",
+               //stretch: true,
+               onValueUpdated: 'updateSelectedStars',
+            },
+         ]
+      },
+      {
+         label: 'Star Aspect Ratio',
+         propertyName: 'filterStarsAspectRatio',
+         type: GroupBox,
+         checkbox: true,
+         checked: false,
+         sizerType: VerticalSizer,
+         stretch: true,
+         onCheck: 'updateSelectedStars',
+         children: [
+            {
+               label: 'Min',
+               propertyName: 'filterStarsMinAspectRatio',
+               statsField: 'psf.aspectRatio.min',
+               type: NumericControl,
+               format: '%d%%',
+               //precision: 3,
+               tip: "Minimum aspect ratio of stars to be selected.",
+               //stretch: true,
+               onValueUpdated: 'updateSelectedStars',
+            },
+            {
+               label: 'Max',
+               statsField: 'psf.aspectRatio.max',
+               propertyName: 'filterStarsMaxAspectRatio',
+               type: NumericControl,
+               format: '%d%%',
+               //precision: 3,
+               tip: "Maximum aspect ratio of stars to be selected.",
+               //stretch: true,
+               onValueUpdated: 'updateSelectedStars',
+            },
+         ]
+      },
+   ],
 };
 
 function ProgressBar(parent, opts) {
@@ -373,7 +473,7 @@ function PreviewControl(parent, opts) {
    buttonsToAdd.forEach(btn => {me.buttons_Sizer.add(btn)});
    this.buttons_Sizer.addStretch();
 
-      this.zoomLabel_Label = new Label(this);
+   this.zoomLabel_Label = new Label(this);
    this.zoomLabel_Label.text = "Zoom:";
    this.zoomLabel_Label.textColor = 0xffffffff;
    this.zoomVal_Label = new Label(this);
@@ -1008,6 +1108,141 @@ function CalculatePSFDialog(parent) {
 
 CalculatePSFDialog.prototype = new Dialog;
 
+function FilterStarsDialog (parent, options) {
+   this.__base__ = Dialog;
+   this.__base__(parent);
+   this.options = options || {};
+   var me = this;
+   this.starUtils = parent.starUtils;
+   this.selectedStars = {};
+
+   this.updateSelectedStars = function () {
+      me.selectedStars = {};
+      var stars = me.starUtils.stars || [];
+      stars.forEach(star => {
+         var selected = true;
+         ['width', 'flux', 'aspectRatio'].forEach(prop => {
+            if (!selected) return;
+            var propName = capitalizedString(prop);
+            var container = me['filterStars' + propName];
+            if (container.checked) {
+               var minCtrl = 'filterStarsMin' + propName;
+               var maxCtrl = 'filterStarsMax' + propName;
+               var min = me[minCtrl].value;
+               var max = me[maxCtrl].value;
+               if (min > max) {
+                  min = max;
+                  me[minCtrl].setValue(min);
+                  me[maxCtrl].setValue(max);
+               }
+               var is_psf = (prop === 'aspectRatio');
+               if (!is_psf || star.psf) {
+                  var obj = (is_psf ? star.psf : star);
+                  var value = obj[prop];
+                  selected = (value >= min && value <= max);
+               }
+            }
+         });
+         if (selected) me.selectedStars[star.id] = true;
+      });
+      var count = Object.keys(me.selectedStars).length;
+      me.countLabel.text = format('%d selected star(s)', count);
+   };
+
+   this.sizer = parent.createVerticalSizer(this);
+   var stats = this.starUtils.stats || {};
+
+   StarUtilsUI.filterStarsDialog.forEach(control => {
+      var getMinMax = function (ctrl) {
+         var propertyStats = stats;
+         var prop = ctrl.statsField;
+         if (prop) {
+            var components = prop.split('.');
+            while (components.length > 1 && propertyStats)
+               propertyStats = propertyStats[components.shift()];
+            if (propertyStats) {
+               var min = propertyStats.min;
+               var max = propertyStats.max;
+               return [min, max];
+            }
+         }
+         return null;
+      };
+      var getRange = function () {
+         var range = null, minMax = null;
+         if ((minMax = getMinMax(this))) {
+            let min = minMax[0];
+            let max = minMax[1];
+            if (min !== undefined && max !== undefined) {
+               const f = 10;
+               range = [
+                  Math.floor(min * f) / f,
+                  Math.ceil(max * f) / f
+               ];
+            }
+         }
+         return range;
+      };
+      var getValue = function () {
+         var ctrl = this;
+         var value = null, minMax = null;
+         var prop = ctrl.statsField;
+         if (!prop) return null;
+         var components = prop.split('.');
+         prop = components[components.length - 1];
+         if (!prop) return null;
+         if ((minMax = getMinMax(ctrl))) {
+            if (prop === 'min') value = minMax[0];
+            else if (prop === 'max') value = minMax[1];
+         }
+         return value;
+      };
+      var element = parent.createControl(control, me.sizer, {
+         parentDialog: me,
+         range: getRange,
+         value: getValue,
+         section: 'filterStarsDialog',
+      });
+   });
+   this.statusSizer = parent.createHorizontalSizer(this);
+   this.countLabel = new Label(this);
+   this.countLabel.textAlignment = TextAlign_Center | TextAlign_VertCenter;
+   this.statusSizer.add(this.countLabel);
+   this.sizer.add(this.statusSizer);
+   this.actionsSizer = parent.createHorizontalSizer(this);
+   this.okButton = new PushButton(this);
+   this.okButton.text = 'Apply';
+   this.okButton.icon = this.scaledResource(":/icons/filter-ok.png");
+   this.okButton.onClick = function () {me.ok()};
+   this.cancelButton = new PushButton(this);
+   this.cancelButton.text = 'Cancel';
+   this.cancelButton.icon = this.scaledResource(":/icons/close.png");
+   this.cancelButton.onClick = function () {me.cancel()};
+   this.actionsSizer.add(this.okButton);
+   this.actionsSizer.add(this.cancelButton);
+   this.sizer.add(this.actionsSizer);
+   this.sizer.addStretch();
+
+   this.onReturn = function (res) {
+      if (res === StdDialogCode_Ok) {
+         var zoom = parent.previewControl.zoom ||
+                    parent.previewControl.zoomThatFits;
+         for (let i = 0; i < parent.starListBox.numberOfChildren; i++) {
+            var node = parent.starListBox.child(i);
+            var star = node.star;
+            node.selected = (me.selectedStars[star.id] === true);
+         }
+         parent.starListBox.onNodeSelectionUpdated();
+      }
+   };
+
+   this.updateSelectedStars();
+   this.windowTitle = "Filter Stars";
+   this.adjustToContents();
+}
+
+FilterStarsDialog.prototype = new Dialog;
+
 function StarUtilsDialog (options) {
 
    this.__base__ = Dialog;
@@ -1576,14 +1811,16 @@ function StarUtilsDialog (options) {
       opts = opts || {};
       var type = control.type;
       if (!type) return null;
+      var parentDialog = opts.parentDialog || this;
       var name = control.name;
       var label = control.label;
       var element = new type(me);
       //element.setFixedWidth(editW);
       if (control.tip) element.toolTip = control.tip;
-      var value = control.value;
+      var value = control.value || opts.value;
       var align = control.align;
       if (align === undefined) align = Align_Default;
+      if (value instanceof Function) value = value.call(control);
       var elementSizer = null;
       var isGroupBox = (type === GroupBox);
       var isButton = (type === PushButton);
@@ -1605,16 +1842,15 @@ function StarUtilsDialog (options) {
           type === SpinBox || type === HorizontalSlider)
       {
          if (label) element.label = label;
-         var range = control.range;
+         var range = control.range || opts.range;
+         if (range instanceof Function) range = range.call(control);
          if (range) element.setRange(range[0], range[1]);
-         if (value !== undefined) {
+         if (value !== undefined && value !== null) {
             element.value = value;
             if (element.setValue) element.setValue(value);
          }
          var precision = control.precision || 2;
          if (element.setPrecision) element.setPrecision(precision);
-         //var extraSizer = null;
-         //element.setFixedWidth(numericEditW);
          var elemAlign = align;
          elementSizer = me.createHorizontalSizer(sizer);
          if (label) elementSizer.add(label, 0, align);
@@ -1623,15 +1859,9 @@ function StarUtilsDialog (options) {
             if (type === SpinBox) elemAlign = Align_Left;
          }
          elementSizer.add(element, 1, elemAlign);
-         /*if (type === SpinBox) {
-            //element.setFixedWidth(numericEditW);
-            //elementSizer.addUnscaledSpacing(numericEditW);
-         } else if (type === HorizontalSlider) {
-            //element.setFixedWidth(numericEditW);
-         }*/
          var onValueUpdated = control.onValueUpdated;
          if (onValueUpdated && typeof(onValueUpdated) === 'string')
-            onValueUpdated = me[onValueUpdated] || null;
+            onValueUpdated = parentDialog[onValueUpdated] || null;
          var updateOutputLabel = null;
          if (control.outputLabel) {
             var updateText = function (val) {
@@ -1667,7 +1897,13 @@ function StarUtilsDialog (options) {
          }
       } else if (isGroupBox) {
          if (label) element.title = label;
-         if (control.checkbox) element.titleCheckBox = true;
+         if (control.checkbox) {
+            element.titleCheckBox = true;
+            element.checked = control.checked !== false;
+            let onCheck = control.onCheck;
+            if (typeof(onCheck) === 'string') onCheck = parentDialog[onCheck];
+            if (onCheck) element.onCheck = onCheck;
+         }
          var children = control.children;
          if (children) {
             var sizerClass = control.sizerType || HorizontalSizer;
@@ -1675,6 +1911,7 @@ function StarUtilsDialog (options) {
             children.forEach(child => {
                var childElem = me.createControl(child, csizer, opts);
             });
+            if (control.stretch === true) csizer.addStretch();
          }
       } else if (type === ComboBox) {
          elementSizer = me.createHorizontalSizer(sizer);
@@ -1698,7 +1935,7 @@ function StarUtilsDialog (options) {
          }
          element.checked = control.checked === true;
          var onCheck = control.onCheck;
-         if (typeof(onCheck) === 'string') onCheck = me[onCheck];
+         if (typeof(onCheck) === 'string') onCheck = parentDialog[onCheck];
          if (onCheck) element.onCheck = onCheck;
       } else if (isButton) {
          if (label) element.text = label;
@@ -1706,6 +1943,8 @@ function StarUtilsDialog (options) {
          elementSizer.margin = 1;
          elementSizer.add(element, 1, align);
       }
+      if (!isGroupBox && control.stretch === true && elementSizer)
+         elementSizer.addStretch();
       if (elementSizer) sizer.add(elementSizer);
       else sizer.add(element);
       if (name) {
@@ -1715,7 +1954,7 @@ function StarUtilsDialog (options) {
             format: control.format,
          }
       }
-      if (control.propertyName) this[control.propertyName] = element;
+      if (control.propertyName) parentDialog[control.propertyName] = element;
       return element;
    };
 
@@ -1939,10 +2178,28 @@ function StarUtilsDialog (options) {
    var starListLabelSizer = this.createHorizontalSizer();
    var starListLbl = new Label(this);
    starListLbl.text = 'Stars';
+   starListLbl.textAlignment = TextAlign_VertCenter;
    this.selectedStarsCountLabel = new Label(this);
    this.selectedStarsCountLabel.text = '';
+   this.selectedStarsCountLabel.textAlignment = TextAlign_VertCenter;
    starListLabelSizer.add(starListLbl, 0, Align_Left);
    starListLabelSizer.add(this.selectedStarsCountLabel, 1, Align_Left);
+   this.starListFilterButton = new ToolButton(this);
+   this.starListFilterButton.icon =
+      this.scaledResource(":/icons/filter-ok.png");
+   this.starListFilterButton.setScaledFixedSize(20,20);
+   this.starListFilterButton.toolTip = "Filter stars selection";
+   this.starListFilterButton.onMousePress = function() {
+      try {
+         var filterDialog = new FilterStarsDialog(me);
+         filterDialog.execute();
+      } catch (e) {
+         me.alert("Error!");
+         me.cancel();
+         throw e;
+      }
+   };
+   starListLabelSizer.add(this.starListFilterButton, 1, Align_Left)
    this.calculatePSFButton = new PushButton(this);
    this.calculatePSFButton.text = 'Calculate PSF';
    this.calculatePSFButton.toolTip =
