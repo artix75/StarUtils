@@ -2124,7 +2124,7 @@ function StarUtilsDialog (options) {
    }
    viewListSizer.add(label, 0, Align_Left);
    this.viewList = new ViewList(this);
-   this.viewList.getAll();
+   this.viewList.getMainViews();
    if (ImageWindow.activeWindow)
       this.viewList.currentView = ImageWindow.activeWindow.mainView;
    var viewId =
