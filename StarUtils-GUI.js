@@ -2409,6 +2409,7 @@ function StarUtilsDialog (options) {
    leftStatusSizer.add(this.statusLabel, 1, Align_Left);
    this.progressLabel = new Label(this);
    this.progressLabel.text = '';
+   this.progressLabel.textAlignment = TextAlign_Center | TextAlign_VertCenter;
    middleStatusSizer.add(this.progressLabel, 0, Align_Center);
    lbl = new Label(this);
    lbl.textAlignment = TextAlign_Right | TextAlign_VertCenter;
@@ -2417,6 +2418,7 @@ function StarUtilsDialog (options) {
    rightStatusSizer.add(lbl, 0, Align_Right);
    this.foundStarsLabel = new Label(this);
    this.foundStarsLabel.text = '---';
+   this.foundStarsLabel.textAlignment = TextAlign_Right | TextAlign_VertCenter;
    rightStatusSizer.add(this.foundStarsLabel, 0, Align_Right);
    this.statusSizer.add(leftStatusSizer, 1);
    this.statusSizer.add(middleStatusSizer, 1);
