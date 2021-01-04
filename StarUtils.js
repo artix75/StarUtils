@@ -264,7 +264,8 @@ StarUtils.prototype = {
       if (targetArea) {
          if (targetArea instanceof View && targetArea.isPreview)
             targetArea = targetArea.window.previewRect(targetArea);
-         log.targetArea = rectToObj(targetArea);
+         this.log.targetArea = rectToObj(targetArea);
+         this.targetArea = targetArea;
          stars = stars.filter(function (star) {
             return targetArea.includes(star.pos.x, star.pos.y);
          });
@@ -1582,6 +1583,12 @@ StarUtils.prototype = {
       var bmp = this.getWindowBmp(win);
       var g = new VectorGraphics(bmp);
       g.antialiasing = true;
+      var targetArea =  this.targetArea;
+      if (targetArea instanceof Rect && opts.drawTargetArea !== false) {
+         g.pen = new Pen(opts.targetAreaColor || 0xffffffff, 1,
+            PenStyle_Solid, PenCap_Round);
+         g.drawRect(targetArea);
+      }
       var me = this;
       stars.forEach(function (star) {
          var r = (opts.enlargedRect ? star.enlargedRect : star.rect);

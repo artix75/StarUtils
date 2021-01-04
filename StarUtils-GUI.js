@@ -1319,6 +1319,8 @@ function StarUtilsDialog (options) {
       opts.onProgressUpdate = function (sd, prog, tot) {
          me.onProgressUpdate(prog, tot);
       };
+      if (view.isPreview && this.targetAreaCheckBox.checked)
+         opts.targetArea = view.window.previewRect(view);
       this.starUtils = new StarUtils(opts);
       this.starsDetected = false;
       return this.starUtils;
@@ -1580,6 +1582,7 @@ function StarUtilsDialog (options) {
                               opts.collapsePanels !== false;
       if (!this.starUtils || !this.starsDetected) {
          this.viewList.enabled = true;
+         this.targetAreaCheckBox.enabled = true;
          this.analyzeButton.enabled = true;
          this.createMaskButton.enabled = false;
          this.statsButton.enabled = false;
@@ -1600,6 +1603,7 @@ function StarUtilsDialog (options) {
          }
       } else {
          this.viewList.enabled = false;
+         this.targetAreaCheckBox.enabled = false;
          this.analyzeButton.enabled = false;
          this.statsButton.enabled = true;
          this.createMaskButton.enabled = true;
@@ -2136,6 +2140,30 @@ function StarUtilsDialog (options) {
    this.viewList.onViewSelected = function (v) {
       me.updateUI();
    }
+   this.targetAreaCheckBox = new CheckBox(this);
+   this.targetAreaCheckBox.checked = false;
+   this.targetAreaCheckBox.text = 'Target Area';
+   this.targetAreaCheckBox.onCheck = function (checked) {
+      let view = me.viewList.currentView, win = null;
+      if (view && !view.isNull) win = view.window;
+      if (checked) {
+         me.viewList.getPreviews();
+         ImageWindow.windows.forEach(window => {
+            if (win && window.mainView.fullId !== win.mainView.fullId) {
+               window.previews.forEach(preview => {
+                  me.viewList.remove(preview);
+               });
+            }
+         });
+      } else {
+         me.viewList.getMainViews();
+         if (win) me.viewList.currentView = win.mainView;
+         else if (ImageWindow.activeWindow)
+            me.viewList.currentView = ImageWindow.activeWindow.mainView;
+      }
+      me.updateUI();
+   }
+   viewListSizer.add(this.targetAreaCheckBox, 0, Align_Right);
 
    /* Star Detection Section */
    var starDetectorBox = this.starDetectorBox = new GroupBox(this);
