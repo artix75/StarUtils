@@ -488,6 +488,37 @@ StarUtils.prototype = {
          return do_get_psf;
       }
    },
+   checkStarPSFData: function (star, psf) {
+      var fwhm;
+      if ((fwhm = psf.FWHMx)) {
+         var xr = fwhm / star.width;
+         if (xr >= 1.75) {
+            console.warningln(
+               format("WARN (%s): abnormal FWHM to Width ratio: %.2f!",
+                  star.id, xr) +
+               " DynamicPSF probabily detected two stars."
+            );
+            psf.invalid = true;
+            psf.warning = "Abnormal FWHM to Width ratio";
+            psf.fwhmWithRatio = xr;
+            psf.starID = star.id;
+            return false;
+         }
+      }
+      var psfCenter = new Point(psf.cx, psf.cy);
+      if (!star.rect.includes(psfCenter)) {
+         console.warningln(
+            format("WARN (%s): psf center outside star rectangle!",
+               star.id) +
+            " DynamicPSF probabily detected another star."
+         );
+         psf.invalid = true;
+         psf.warning = "PSF center outside star rectangle";
+         psf.starID = star.id;
+         return false;
+      }
+      return true;
+   },
    getStarPSFData: function (star) {
       var me = this;
       var lview = this.luminanceView;
@@ -497,20 +528,18 @@ StarUtils.prototype = {
       var psf = null;
       if (psfrows.length > 0) {
          psf = psfrows[0];
-         var fwhm;
-         if ((fwhm = psf.FWHMx)) {
-            var xr = fwhm / star.width;
-            if (xr >= 1.75) {
-               console.warningln(
-                  format("WARN (%s): abnormal FWHM to width ratio: %.2f!",
-                     star.id, xr) +
-                  " DynamicPSF probabily detected two stars, " +
-                  "retrying with automatic aperture disabled..."
-               );
-               psf = null;
-               psfrows = this.detectPSF(star, lview, {autoAperture: false});
-               if (psfrows.length > 0) psf = psfrows[0];
-            }
+         var maxRetries = 2;
+         while (psf && !this.checkStarPSFData(star, psf)) {
+            if (!this.invalidPSF) this.invalidPSF = {};
+            if (!this.invalidPSF[star.id]) this.invalidPSF[star.id] = [];
+            this.invalidPSF[star.id].push(psf);
+            psf = null;
+            if (--maxRetries <= 0) break;
+            console.warningln(star.id +
+               ": Retrying with automatic aperture disabled...");
+            psfrows = this.detectPSF(star, lview, {autoAperture: false});
+            if (psfrows.length > 0) psf = psfrows[0];
+            else break;
          }
       }
       if (psf) {
@@ -1081,6 +1110,7 @@ StarUtils.prototype = {
                aspectRatio: row[9] / row[8], // 1 = perfect circle, < 1 rounded circle
                FWHMx: fwhm.x,
                FWHMy: fwhm.y,
+               autoAperture: P.autoAperture,
             });
       });
       return psf;

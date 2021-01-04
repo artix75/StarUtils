@@ -1399,11 +1399,27 @@ function StarUtilsDialog (options) {
          return format('<b>%s</b> %.2f', lbl, star.pos[prop]);
       }).join("<br>");
       if (star.psf) {
+         var psfProps = ['cx', 'cy', 'sx', 'sy', 'FWHMx', 'FWHMy',
+            'autoAperture'];
          tooltip += "<br><br><b>PSF</b><br><br>";
-         tooltip += ['cx', 'cy', 'sx', 'sy', 'FWHMx', 'FWHMy'].map(prop => {
+         tooltip += psfProps.map(prop => {
             var lbl = padString(prop + ':', 6);
-            return format('<b>%s</b> %.2f', lbl, star.psf[prop]);
+            var psfVal = star.psf[prop];
+            var isBool = (psfVal === true || psfVal === false);
+            var fmtVal = (isBool ? '%s' : '%.2f');
+            if (isBool) psfVal = psfVal.toString();
+            return format('<b>%s</b> ' + fmtVal, lbl, psfVal);
          }).join("<br>");
+      } else if (me.starUtils.invalidPSF && me.starUtils.invalidPSF[star.id]) {
+         let warns = {};
+         me.starUtils.invalidPSF[star.id].forEach(psf => {
+            warns[psf.warning] = true;
+         });
+         warns = Object.keys(warns);
+         tooltip += "<br><div style=\"color:rgb(230, 150, 80)\">" +
+            "<b>Discarded PSF</b><br>" +
+            warns.map(warn => '- <i>' + warn + '</i>').join('<br>') +
+            "</div>";
       }
       tooltip +=
       '<br><br><i>Click to select, double click to zoom on star</i>';
