@@ -88,6 +88,12 @@ function rectToObj(r) {
    return {x: r.left, y: r.top, width: r.width, height: r.height};
 }
 
+function angleBetweenPoints(p1, p2) {
+   let dx = p2.x - p1.x;
+   let dy = p2.y - p1.y;
+   return Math.atan2(dy, dx) * 180 / Math.PI;
+}
+
 function consoleFormattedString(string, style) {
    var color = style.color;
    if (color) {
@@ -594,6 +600,52 @@ StarUtils.prototype = {
          this.setStatus("Done");
       }
       return recalculatedStars;
+   },
+   detectPSFDoubleStars: function (opts) {
+      var me = this;
+      opts = opts || {};
+      if (!this.stars || this.stars.length === 0) return;
+      if (!this.starsWithPSF || this.starsWithPSF.length === 0) return;
+      var doUpdateProgress = opts.updateProgress === true;
+      if (doUpdateProgress) {
+         this.setStatus("Detecting PSF double stars");
+         this.updateProgress(0,0);
+      }
+      var tot = this.starsWithPSF.length;
+      this.starsWithPSF.forEach((psfStar, i) => {
+         processEvents();
+         if (me.abortRequested) return;
+         if (doUpdateProgress) me.updateProgress(i + 1, tot);
+         var w = psfStar.psf.FWHMx * 1.2, h = psfStar.psf.FWHMy * 1.2;
+         var left = psfStar.psf.cx - (w / 2), top = psfStar.psf.cy - (h / 2);
+         var angle = psfStar.psf.angle * -1;
+         var rect = new Rect(left, top, left + w, top + h);
+         rect.rotate(angle * Math.PI / 180, rect.center);
+         me.stars.forEach(star => {
+            processEvents();
+            if (me.abortRequested) return;
+            if (star === psfStar || star.id === psfStar.id) return;
+            if (rect.includes(star.pos.x, star.pos.y)) {
+               let t = angleBetweenPoints(star.pos, psfStar.pos);
+               if (t < 0) t *= -1;
+               if (t > 180) t = 360 - t;
+               if (Math.abs(angle - t) < 5) {
+                  console.warningln(
+                     format(
+                        "Star %s PSF rectangle contains star %s with angle %.2f",
+                        psfStar.id, star.id, t
+                     )
+                  );
+                  if (psfStar.containsStars === undefined)
+                     psfStar.containsStars = {};
+                  psfStar.containsStars[star.id] = t;
+               }
+            }
+         });
+      });
+      processEvents();
+      if (me.abortRequested) return;
+      if (doUpdateProgress) this.setStatus("Done");
    },
    updatePSFStats: function () {
       /* Update stats with PSF info */

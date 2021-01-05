@@ -1692,6 +1692,7 @@ function StarUtilsDialog (options) {
          this.foundStarsLabel.text = '' + sd.stars.length;
          sd.setLimits();
          sd.classifyStars();
+         //sd.detectPSFDoubleStars({updateProgress: true});
          this.onStatusUpdate('Done');
          this.onProgressUpdate(0,0);
          if (me.abortRequested) return;
