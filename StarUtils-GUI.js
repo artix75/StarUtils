@@ -2582,7 +2582,7 @@ function StarUtilsDialog (options) {
    this.sizer.add(this.statusSizer);
    this.sizer.add(this.actionSizer);
 
-   this.windowTitle = "StarUtils";
+   this.windowTitle = "StarUtils - " + STARUTILS_VERSION;
    this.updateUI();
    this.adjustToContents();
 };

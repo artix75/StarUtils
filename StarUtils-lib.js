@@ -21,6 +21,7 @@
 #include <pjsr/PenStyle.jsh>
 #include <pjsr/FileMode.jsh>
 #include <pjsr/DataType.jsh>
+#include "StarUtils-version.jsh"
 
 #ifndef __STARUTILS_LIB_JS__
 #define __STARUTILS_LIB_JS__
