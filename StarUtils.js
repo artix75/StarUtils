@@ -22,6 +22,9 @@
 #include <pjsr/FileMode.jsh>
 #include <pjsr/DataType.jsh>
 
+#ifndef __STARUTILS_LIB_JS__
+#define __STARUTILS_LIB_JS__
+
 #define STRING_PAD_LEFT  1
 #define STRING_PAD_RIGHT 2
 
@@ -2022,3 +2025,5 @@ StarUtils.prototype = {
       if (this.onProgressUpdate) this.onProgressUpdate(this, progress, tot);
    }
 };
+
+#endif /* __STARUTILS_LIB_JS__ */
