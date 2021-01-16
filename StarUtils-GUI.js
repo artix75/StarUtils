@@ -16,8 +16,6 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-#include "StarUtils.js"
-
 #include <pjsr/Sizer.jsh>
 #include <pjsr/FrameStyle.jsh>
 #include <pjsr/TextAlign.jsh>
@@ -34,6 +32,11 @@
 #include <pjsr/ButtonCodes.jsh>
 #include <pjsr/SectionBar.jsh>
 #include <pjsr/StdDialogCode.jsh>
+
+#include "StarUtils-lib.js"
+
+#ifndef __STARUTILS_GUI_JS__
+#define __STARUTILS_GUI_JS__
 
 var StarUtilsUI = {
    starDetector: [
@@ -2585,14 +2588,5 @@ function StarUtilsDialog (options) {
 };
 
 StarUtilsDialog.prototype = new Dialog;
-function main() {
-   jsAbortable = true;
-   console.abortEnabled = true;
-   var dialog = new StarUtilsDialog();
-   dialog.restyle();
-   do {
-      var res = dialog.execute();
-   } while (res);
-}
 
-main();
+#endif /* __STARUTILS_GUI_JS__ */
