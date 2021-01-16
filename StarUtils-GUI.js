@@ -2154,7 +2154,7 @@ function StarUtilsDialog (options) {
    var viewId =
       (!this.viewList.currentView.isNull ? this.viewList.currentView.id : null);
    viewId = viewId || '------------';
-   viewId += 'MMMMMM';
+   viewId += 'MMMMMMMMM';
    this.viewList.setFixedWidth(this.font.width(viewId));
    viewListSizer.add(this.viewList, 1, Align_Left);
    this.viewList.onViewSelected = function (v) {
