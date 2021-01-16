@@ -2143,8 +2143,17 @@ function StarUtilsDialog (options) {
       text = "View: ";
       textAlignment = TextAlign_Left | TextAlign_VertCenter;
       margin = 4;
-      wordWrapping = true;
+      wordWrapping = false;
       setFixedWidth(me.calculateLabelFixedWidth(label) + oneCharW);
+   }
+   var tipLabel = new Label(this);
+   with (tipLabel) {
+      text = "<i><b>Tip:</b> use a star-only image</i>";
+      textAlignment = TextAlign_Left | TextAlign_VertCenter;
+      margin = 4;
+      wordWrapping = false;
+      useRichText = true;
+      setFixedWidth(me.calculateLabelFixedWidth(tipLabel) + oneCharW);
    }
    viewListSizer.add(label, 0, Align_Left);
    this.viewList = new ViewList(this);
@@ -2160,6 +2169,7 @@ function StarUtilsDialog (options) {
    this.viewList.onViewSelected = function (v) {
       me.updateUI();
    }
+   viewListSizer.add(tipLabel, 0, Align_Left);
    this.targetAreaCheckBox = new CheckBox(this);
    this.targetAreaCheckBox.checked = false;
    this.targetAreaCheckBox.text = 'Target Area';

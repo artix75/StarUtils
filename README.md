@@ -1,6 +1,6 @@
 # StarUtils - A PixInsight® script for star analysis and fixing
 
-StarUtils is a [PixInsight®](https://pixinsight.com/) script that can be used to analyze stars, create masks from them and, finally, to fix them.
+StarUtils is a [PixInsight®](https://pixinsight.com/) (a popular astrophotography processing software) script that can be used to analyze stars, create masks from them and, finally, to fix them.
 Star fixing mainly consists of two separate process that can also be selectively enabled or disabled: **elongation fix** and **star reduction**.
 
 Under the hood, StarUtils uses PixInsight's StarDetector class in order to detect stars inside the image and then it tries to find a valid **PSF solution** for stars matching various tunable parameters by using [DynamicPSF process](https://pixinsight.com/doc/tools/DynamicPSF/DynamicPSF.html).
