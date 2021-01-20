@@ -64,7 +64,7 @@ var StarUtilsUI = {
          type: NumericControl,
          value: 1,
          range: [0, 10],
-         tip: 'Stars with peak values greater than this value won\'t be detected..',
+         tip: 'Stars with peak values greater than this value won\'t be detected.',
       },
       {
          label: 'Max Distortion',
