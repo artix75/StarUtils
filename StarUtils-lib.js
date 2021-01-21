@@ -1012,7 +1012,7 @@ StarUtils.prototype = {
       new_w.mainView.id = win.mainView.id + '_' + suffix;
       if (opts.copyImage) {
          new_w.mainView.beginProcess(UndoFlag_NoSwapFile);
-         new_w.mainView.assign(img);
+         new_w.mainView.image.assign(img);
          new_w.mainView.endProcess();
       }
       if (is_temp) this.temporaryWindows.push(new_w);

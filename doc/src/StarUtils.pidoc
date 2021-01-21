@@ -78,7 +78,7 @@
 
         \figure[width:50\%] {
             \image[width:100\%] ../images/starutils-dialog-detection-list-preview.png
-            \figtag Script window after star detection
+            \figtag The star list and the preview image. Selected stars are marked by a green box.
         }
 
         The star list will list all the detected stars. Each star will be identified by an \s {ID} that is something like \e {s1},\e {s2}, and so on, where the number depends on the detection order.
@@ -145,12 +145,21 @@
             You can choose the amount of reduction by tuning the \e {Morphological Selection} slider inside the box.
          }
 
+         \subsection {Fix Options} {
+            \table[caption,unnumbered] {
+               {Fix Options}
+               {{\s {Replace current image}} {Apply fixes un current selected image.}}
+               {{\s {Create new image}} {Apply fixes on a new image that's a clone of the current selected image.}}
+               {{\s {Image Id}} {If \s {Create new image} is enabled, this field allows you to specify the new image ID (leave it empty or <Auto> in order to give it an automatic Id).}}
+            }
+         }
+
          \subsection {Examples} {
             \figure[width:50\%] {
                \image[width:100\%] ../images/star_utils_unfixed.jpg
                \image[width:100\%] ../images/star_utils_fix_elong.jpg
                \image[width:100\%] ../images/star_utils_fix_elong_reduce.jpg
-               \figtag From left to right: unfixed image, same image after elongation fix and, on the right, after elongation fix and star reduction.
+               \figtag From top to bottom: unfixed image, same image after elongation fix and, on the right, after elongation fix and star reduction.
             }
          }
 

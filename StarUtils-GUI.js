@@ -38,6 +38,8 @@
 #ifndef __STARUTILS_GUI_JS__
 #define __STARUTILS_GUI_JS__
 
+#define TEXTFIELD_AUTO '<Auto>'
+
 var StarUtilsUI = {
    starDetector: [
       {
@@ -224,7 +226,7 @@ var StarUtilsUI = {
       },
    ],
    fixOptions: [
-      {
+      /*{
          label: 'Create Process Container',
          propertyName: 'fixCreateProcessContainer',
          type: CheckBox,
@@ -232,6 +234,31 @@ var StarUtilsUI = {
          onCheck: 'onCreateProcessContainerCheck',
          tip: "Create a ProcessContainer instance containing all processes\n"+
               "applied to fix stars",
+      },*/
+      {
+         label: 'Replace current image',
+         propertyName: 'fixReplaceCurrentImage',
+         type: RadioButton,
+         checked: true,
+         onCheck: 'onDestinationImageChange',
+         tip: "Apply fixes to current image."
+      },
+      {
+         label: 'Create new image',
+         propertyName: 'fixCreateNewImage',
+         type: RadioButton,
+         checked: false,
+         onCheck: 'onDestinationImageChange',
+         tip: "Apply fixes to current image."
+      },
+      {
+         label: 'Image Id',
+         propertyName: 'fixNewImageID',
+         type: Edit,
+         enabled: false,
+         clearButton: true,
+         value: TEXTFIELD_AUTO,
+         tip: "New Image Id."
       },
    ],
    filterStarsDialog: [
@@ -1258,6 +1285,7 @@ function StarUtilsDialog (options) {
    this.status = null;
    this.detecting = false;
    this.abortRequested = false;
+   this.createNewImage = false;
    var me = this;
 
    this.onClose = function (retval) {
@@ -1811,7 +1839,9 @@ function StarUtilsDialog (options) {
          var getMaxWidth = function (control) {
             var w = 0;
             var t = control.type;
-            if (control.label && t !== GroupBox && t !== CheckBox) {
+            var hasLabelLeft =
+               (t !== GroupBox && t !== CheckBox && t !== RadioButton);
+            if (control.label && hasLabelLeft) {
                w = me.font.width(control.label + ':');
             }
             if (w > maxWidth) maxWidth = w;
@@ -1849,18 +1879,19 @@ function StarUtilsDialog (options) {
       var isGroupBox = (type === GroupBox);
       var isButton = (type === PushButton);
       var isCheckbox = (type === CheckBox);
+      var isRadio = (type === RadioButton);
       if (!isGroupBox && !isButton && label) {
          var txt = label;
          label = new Label(element);
          label.text = txt;
-         if (!isCheckbox) label.text += ':';
+         if (!isCheckbox && !isRadio) label.text += ':';
          var lblAlign = (isCheckbox ? TextAlign_Left : TextAlign_Right);
          label.textAlignment = lblAlign | TextAlign_VertCenter;
          var labelWidth = opts.labelWidth || control.labelWidth;
          if (!labelWidth && opts.section)
             labelWidth = this.calculateLabelFixedWidth(label, opts.section);
          labelWidth = labelWidth || labelW;
-         if (!isCheckbox)label.setFixedWidth(labelWidth);
+         if (!isCheckbox && !isRadio) label.setFixedWidth(labelWidth);
       }
       if (type === NumericControl || type === NumericEdit ||
           type === SpinBox || type === HorizontalSlider)
@@ -1919,6 +1950,21 @@ function StarUtilsDialog (options) {
                if (onValueUpdated) onValueUpdated.call(element, val);
             }
          }
+      } else if (type === Edit) {
+         elementSizer = me.createHorizontalSizer(sizer);
+         if (label) elementSizer.add(label, 0, align);
+         element.readOnly = (control.readOnly === true);
+         if (value) element.text = '' + value;
+         elementSizer.add(element, 1, align);
+         if (control.clearButton === true) {
+            var clearButton = new ToolButton;
+            clearButton.icon =
+               me.scaledResource(":/icons/clear.png");
+            clearButton.setScaledFixedSize(20,20);
+            clearButton.toolTip = "Clear";
+            clearButton.onClick = function () {element.clear()};
+            elementSizer.add(clearButton, 1, align);
+         }
       } else if (isGroupBox) {
          if (label) element.title = label;
          if (control.checkbox) {
@@ -1949,7 +1995,7 @@ function StarUtilsDialog (options) {
          items.forEach(item => {element.addItem(item)});
          elementSizer.add(element, 1, Align_Left);
          //elementSizer.addStretch(numericEditW);
-      } else if (isCheckbox) {
+      } else if (isCheckbox || isRadio) {
          element.setFixedWidth(me.font.width('MMM'));
          elementSizer = me.createHorizontalSizer(sizer);
          elementSizer.add(element, 0, align);
@@ -1971,6 +2017,8 @@ function StarUtilsDialog (options) {
          elementSizer.addStretch();
       if (elementSizer) sizer.add(elementSizer);
       else sizer.add(element);
+      if (control.enabled === false || control.disabled === true)
+         element.enabled = false;
       if (name) {
          me.optControls[name] = {
             element: element,
@@ -2041,8 +2089,20 @@ function StarUtilsDialog (options) {
          alert("Both 'Fix Elongated Stars' && 'Reduce Stars' are disabled");
          return;
       }
+      this.destWin = null;
+      if (this.createNewImage) {
+         var newImageId = this.fixNewImageID.text;
+         if (newImageId === TEXTFIELD_AUTO) newImageId = '';
+         this.destWin = sd.cloneCurrentWindow('fixed_stars', {copyImage: true});
+         if (newImageId.trim().length > 0)
+            this.destWin.mainView.id = newImageId;
+      }
       var processContainer = this.processContainer = null;
-      if (this.fixCreateProcessContainer.checked)
+      var createProcessContainer = (
+         this.fixCreateProcessContainer !== undefined &&
+         this.fixCreateProcessContainer.checked
+      );
+      if (createProcessContainer)
          processContainer = this.processContainer = new ProcessContainer;
       me.enabled = false;
       try {
@@ -2063,6 +2123,7 @@ function StarUtilsDialog (options) {
                keepMask: keepMask,
                filter: filter,
                processContainer: processContainer,
+               win: this.destWin,
             };
             sd.fixElongatedStars(fixOpts);
          }
@@ -2074,7 +2135,7 @@ function StarUtilsDialog (options) {
                selection: selection,
                processContainer: processContainer,
             };
-            sd.reduceStars(null, null, reduceOptions);
+            sd.reduceStars(null, this.destWin, reduceOptions);
          }
          if (me.abortRequested) return;
          var question = "Star fixing completed. Do you want to rescan image?";
@@ -2113,6 +2174,12 @@ function StarUtilsDialog (options) {
    this.onCreateProcessContainerCheck = function (checked) {
       if (checked)
          me.alert("Warning: this option could generate too much mask images!");
+   };
+
+   this.onDestinationImageChange = function (checked) {
+      var control = this;
+      me.createNewImage = (checked && (control === me.fixCreateNewImage));
+      me.fixNewImageID.enabled = me.createNewImage;
    };
 
    var labelW = this.font.width("Upper Peak Limit:");
@@ -2444,6 +2511,17 @@ function StarUtilsDialog (options) {
       });
       sizer.addStretch();
    }
+
+
+   this.fixNewImageID.onGetFocus = function () {
+      var text = this.text;
+      if (text === TEXTFIELD_AUTO) this.clear();
+   };
+
+   this.fixNewImageID.onLoseFocus = function () {
+      var text = this.text;
+      if (text.trim().length === 0) this.text = TEXTFIELD_AUTO;
+   };
 
    this.rightSizer.add(maskBox);
    this.rightSizer.add(fixElongationBox);
