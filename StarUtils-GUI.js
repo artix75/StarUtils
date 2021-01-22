@@ -490,7 +490,7 @@ function PreviewControl(parent, opts) {
          var btn = new btnType(me);
          if (btnDef.name) me[btnDef.name] = btn;
          var icon = btnDef.icon;
-         if (icon) btn.icon = icon;
+         if (icon) btn.icon = me.scaledResource(icon);
          btn.setScaledFixedSize(20, 20);
          if (btnDef.tooltip) btn.toolTip = btnDef.tooltip;
          var onClick = btnDef.onClick, onCheck = btnDef.onCheck;
@@ -2394,11 +2394,12 @@ function StarUtilsDialog (options) {
    var tipLabel = new Label(this);
    with (tipLabel) {
       text = "<i><b>Tip:</b> use a star-only image</i>";
+      let labelW = me.font.width("Tip: use a star-only image");
       textAlignment = TextAlign_Left | TextAlign_VertCenter;
       margin = 4;
       wordWrapping = false;
       useRichText = true;
-      setFixedWidth(me.calculateLabelFixedWidth(tipLabel) + oneCharW);
+      setFixedWidth(labelW + (oneCharW * 2));
    }
    viewListSizer.add(label, 0, Align_Left);
    this.viewList = new ViewList(this);
@@ -2410,11 +2411,9 @@ function StarUtilsDialog (options) {
    viewId = viewId || '------------';
    viewId += 'MMMMMMMMM';
    this.viewList.setFixedWidth(this.font.width(viewId));
-   viewListSizer.add(this.viewList, 1, Align_Left);
    this.viewList.onViewSelected = function (v) {
       me.updateUI();
    }
-   viewListSizer.add(tipLabel, 0, Align_Left);
    this.targetAreaCheckBox = new CheckBox(this);
    this.targetAreaCheckBox.checked = false;
    this.targetAreaCheckBox.text = 'Target Area';
@@ -2438,7 +2437,25 @@ function StarUtilsDialog (options) {
       }
       me.updateUI();
    }
-   viewListSizer.add(this.targetAreaCheckBox, 0, Align_Right);
+   this.helpButton = new ToolButton(this);
+   with (this.helpButton) {
+      icon = me.scaledResource(":/process-interface/browse-documentation.png");
+      toolTip = "Browse documentation";
+      setScaledFixedSize(20,20);
+      onClick = function () {
+         let scriptfile = #__FILE__;
+         let scriptdir = File.extractDirectory(scriptfile);
+         let helpfile = File.appendToName(scriptdir,
+            '/doc/PIDoc/scripts/StarUtils/StarUtils.html');
+         //console.noteln(helpfile);
+         Dialog.openBrowser('file://' + helpfile);
+      }
+   }
+   viewListSizer.add(this.viewList, 1, Align_Left);
+   viewListSizer.add(tipLabel, 1, Align_Left);
+   viewListSizer.add(this.targetAreaCheckBox, 1, Align_Left);
+   viewListSizer.addStretch();
+   viewListSizer.add(this.helpButton, 1, Align_Right);
 
    /* Star Detection Section */
    var starDetectorBox = this.starDetectorBox = new GroupBox(this);
