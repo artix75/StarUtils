@@ -38,7 +38,8 @@
 #ifndef __STARUTILS_GUI_JS__
 #define __STARUTILS_GUI_JS__
 
-#define TEXTFIELD_AUTO '<Auto>'
+#define IMAGEID_AUTO '<Auto>'
+#define MAX_PREVIEW_STARS 4
 
 var StarUtilsUI = {
    starDetector: [
@@ -244,6 +245,14 @@ var StarUtilsUI = {
          tip: "Apply fixes to current image."
       },
       {
+         label: 'Preview on selected stars',
+         propertyName: 'fixPreviewSelectedStars',
+         type: RadioButton,
+         checked: false,
+         onCheck: 'onDestinationImageChange',
+         tip: "Just preview fixes on (max. 3) selected stars (do not apply fixes at all)."
+      },
+      {
          label: 'Create new image',
          propertyName: 'fixCreateNewImage',
          type: RadioButton,
@@ -257,7 +266,7 @@ var StarUtilsUI = {
          type: Edit,
          enabled: false,
          clearButton: true,
-         value: TEXTFIELD_AUTO,
+         value: IMAGEID_AUTO,
          tip: "New Image Id."
       },
    ],
@@ -1273,6 +1282,129 @@ function FilterStarsDialog (parent, options) {
 
 FilterStarsDialog.prototype = new Dialog;
 
+function FixPreviewDialog(parent, stars, fixedImage) {
+   this.__base__ = Dialog;
+   this.__base__(parent);
+   var me = this;
+
+   if (stars.length === 0) {
+      throw "FilterStarsDialog: No stars!";
+   }
+
+   var header_height = this.font.boundingRect('M').height * 1.5;
+   var hmargin = 10, vmargin = 10, separator_w = 10;
+   this.stars = stars;
+   this.starUtils = parent.starUtils;
+   this.srcImage = this.starUtils.srcImage.render();
+   this.fixedImage = fixedImage;
+   var w = 0, h = header_height;
+   stars.forEach(star => {
+      var rect = star.enlargedRect;
+      h += rect.height;
+      var row_w = rect.width * 2;
+      if (row_w > w) w = row_w;
+   });
+   w += (separator_w + hmargin);
+   h += hmargin;
+
+   this.createPreviewImages = function () {
+      me.previewImages = {};
+      me.stars.forEach(star => {
+         var rect = star.enlargedRect;
+         var srcStarImage = new Bitmap(me.srcImage, rect);
+         var fixedStarImage = new Bitmap(me.fixedImage, rect);
+         me.previewImages[star.id] = {
+            original: srcStarImage,
+            fixed: fixedStarImage
+         };
+      });
+   };
+
+   this.sizer = parent.createVerticalSizer(this);
+   this.imageFrame = new Frame(this);
+   this.imageFrame.setFixedWidth(w);
+   this.imageFrame.setFixedHeight(h);
+
+   this.closeButton = new PushButton(this);
+   this.closeButton.text = 'Close';
+   this.closeButton.icon = this.scaledResource(":/icons/close.png");
+   this.closeButton.onClick = function () {
+      me.cancel();
+   }
+
+   this.sizer.add(this.imageFrame);
+   this.sizer.add(this.closeButton);
+
+   this.imageFrame.onPaint = function (x0, y0, x1, y1) {
+      var graphics = new VectorGraphics(this);
+      graphics.fillRect(x0,y0, x1, y1, new Brush(0xff000000));
+      graphics.pen = new Pen(0xffffffff,0);
+      let align = TextAlign_Center | TextAlign_VertCenter;
+      let center_x = w / 2;
+      let xcenters = [Math.round(w * 0.25), Math.round(w * 0.75)];
+      graphics.drawTextRect(0, 0, center_x, header_height, 'ORIGINAL', align);
+      graphics.drawTextRect(center_x, 0, w, header_height, 'FIXED', align);
+      graphics.drawLine(center_x, 0, center_x, h);
+      let has_images = (
+         me.previewImages !== undefined &&
+         Object.keys(me.previewImages).length === me.stars.length
+      );
+      if (has_images) {
+         let offsetY = header_height + (vmargin / 2);
+         me.stars.forEach(star => {
+            let images = me.previewImages[star.id];
+            let rect = star.enlargedRect;
+            let rcx = Math.round(rect.width / 2);
+            graphics.drawBitmap(xcenters[0] - rcx, offsetY, images.original);
+            graphics.drawBitmap(xcenters[1] - rcx, offsetY, images.fixed);
+            offsetY += rect.height;
+         });
+      }
+      graphics.end();
+   }
+
+   this.onExecute = function () {
+      try {
+         me.createPreviewImages();
+         me.imageFrame.update();
+      } catch (e) {
+         me.error = e;
+         me.result = StdDialogCode_Cancel;
+      }
+   };
+
+   this.onShow = function () {
+      try {
+         me.imageFrame.update();
+      } catch (e) {
+         me.error = e;
+         me.result = StdDialogCode_Cancel;
+      }
+      if (this.error) {
+         var errmsg = "Error executing Fix Preview Dialog:\n" +
+            this.error.message;
+         var t = new Timer(2, false);
+         t.onTimeout = function () {
+            me.parent.exception = me.error;
+            me.parent.alert(errmsg);
+            me.cancel();
+         };
+         t.start();
+      }
+   }
+
+   this.onClose = function () {
+      this.srcImage = null;
+      this.fixedImage = null;
+      this.previewImages = null;
+      gc(true);
+   };
+
+   this.windowTitle = "Fixed Stars Preview";
+   this.adjustToContents();
+}
+FixPreviewDialog.prototype = new Dialog;
+
 function StarUtilsDialog (options) {
 
    this.__base__ = Dialog;
@@ -1286,6 +1418,7 @@ function StarUtilsDialog (options) {
    this.detecting = false;
    this.abortRequested = false;
    this.createNewImage = false;
+   this.previewFix = false;
    var me = this;
 
    this.onClose = function (retval) {
@@ -2090,12 +2223,27 @@ function StarUtilsDialog (options) {
          return;
       }
       this.destWin = null;
+      let previewStars = null;
       if (this.createNewImage) {
          var newImageId = this.fixNewImageID.text;
-         if (newImageId === TEXTFIELD_AUTO) newImageId = '';
+         if (newImageId === IMAGEID_AUTO) newImageId = '';
          this.destWin = sd.cloneCurrentWindow('fixed_stars', {copyImage: true});
          if (newImageId.trim().length > 0)
             this.destWin.mainView.id = newImageId;
+      } else if (this.previewFix) {
+         previewStars = this.getSelectedStars();
+         let errmsg = null;
+         if (previewStars.length > MAX_PREVIEW_STARS) {
+            errmsg =format("You can use no more than %d stars for preview",
+               MAX_PREVIEW_STARS);
+         } else if (previewStars.length === 0) {
+            errmsg = 'No stars selected';
+         }
+         if (errmsg) {
+            me.alert(errmsg);
+            return;
+         }
+         this.destWin = sd.cloneCurrentWindow(null, {copyImage: true});
       }
       var processContainer = this.processContainer = null;
       var createProcessContainer = (
@@ -2109,10 +2257,17 @@ function StarUtilsDialog (options) {
          if (doFixElongation) {
             var threshold = me.fixElongatedStarsThreshold.value;
             var factor = me.fixElongatedStarsFixFactor.value;
-            var keepMask = me.fixElongatedStarsKeepMasks.checked;
+            var keepMask = (
+                  me.fixElongatedStarsKeepMasks.checked &&
+                  !me.previewFix
+            );
             var filter = null;
-            if (me.fixElongatedStarsOnlySelected.checked) {
-               var stars = me.getSelectedStars();
+            let onlySelected = (
+               me.fixElongatedStarsOnlySelected.checked ||
+               me.previewFix
+            );
+            if (onlySelected) {
+               var stars = previewStars || me.getSelectedStars();
                var selected = {};
                stars.forEach(star => {selected[star.id] = true});
                filter = function (star) {return selected[star.id] === true};
@@ -2135,9 +2290,31 @@ function StarUtilsDialog (options) {
                selection: selection,
                processContainer: processContainer,
             };
-            sd.reduceStars(null, this.destWin, reduceOptions);
+            let stars = (this.previewFix ? previewStars : null);
+            sd.reduceStars(stars, this.destWin, reduceOptions);
          }
          if (me.abortRequested) return;
+
+         if (this.previewFix) {
+            let fixedImageBmp = this.destWin.mainView.image.render(1.5);
+            this.destWin.forceClose();
+            this.destWin = null;
+            try {
+               this.exception = null;
+               var dialog =
+                  new FixPreviewDialog(this, previewStars, fixedImageBmp);
+               if (!dialog) return;
+               var res = dialog.execute();
+               if (this.exception) throw this.exception;
+            } catch (e) {
+               me.deleteStarUtils();
+               me.cancel();
+               throw(e);
+            }
+            me.enabled = true;
+            return;
+         }
+
          var question = "Star fixing completed. Do you want to rescan image?";
          var msgBox = new MessageBox(question, "StarUtils", StdIcon_Question,
             StdButton_Yes, StdButton_No);
@@ -2179,6 +2356,7 @@ function StarUtilsDialog (options) {
    this.onDestinationImageChange = function (checked) {
       var control = this;
       me.createNewImage = (checked && (control === me.fixCreateNewImage));
+      me.previewFix = (checked && (control === me.fixPreviewSelectedStars));
       me.fixNewImageID.enabled = me.createNewImage;
    };
 
@@ -2515,12 +2693,12 @@ function StarUtilsDialog (options) {
 
    this.fixNewImageID.onGetFocus = function () {
       var text = this.text;
-      if (text === TEXTFIELD_AUTO) this.clear();
+      if (text === IMAGEID_AUTO) this.clear();
    };
 
    this.fixNewImageID.onLoseFocus = function () {
       var text = this.text;
-      if (text.trim().length === 0) this.text = TEXTFIELD_AUTO;
+      if (text.trim().length === 0) this.text = IMAGEID_AUTO;
    };
 
    this.rightSizer.add(maskBox);
@@ -2670,7 +2848,7 @@ function StarUtilsDialog (options) {
    this.sizer.add(this.statusSizer);
    this.sizer.add(this.actionSizer);
 
-   this.windowTitle = "StarUtils - " + STARUTILS_VERSION;
+   this.windowTitle = "StarUtils - v" + STARUTILS_VERSION;
    this.updateUI();
    this.adjustToContents();
 };
