@@ -250,7 +250,8 @@ var StarUtilsUI = {
          type: RadioButton,
          checked: false,
          onCheck: 'onDestinationImageChange',
-         tip: "Just preview fixes on (max. 3) selected stars (do not apply fixes at all)."
+         tip: "Just preview fixes on (max. " + MAX_PREVIEW_STARS +
+              ") selected stars (do not apply fixes at all)."
       },
       {
          label: 'Create new image',

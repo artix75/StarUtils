@@ -149,8 +149,14 @@
             \table[caption,unnumbered] {
                {Fix Options}
                {{\s {Replace current image}} {Apply fixes un current selected image.}}
+               {{\s {Preview on selected stars}} {Just preview fixes on (max. 4) selected stars (do not apply fixes at all).}}
                {{\s {Create new image}} {Apply fixes on a new image that's a clone of the current selected image.}}
                {{\s {Image Id}} {If \s {Create new image} is enabled, this field allows you to specify the new image ID (leave it empty or <Auto> in order to give it an automatic Id).}}
+            }
+
+            \figure[width:50\%] {
+               \image[width:100\%] ../images/starutils-dialog-detection-fix-preview.png
+               \figtag {Using \s {Preview on selected stars} mode.}
             }
          }
 
