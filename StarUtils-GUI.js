@@ -118,7 +118,7 @@ var StarUtilsUI = {
                outputLabel: true,
                onValueUpdated: 'onPSFThresholdUpdated',
                tip: "Width threshold for PSF data extraction. With lower values,\n"+
-                    "PSF will be calculated for more stars, but star detection\n"+
+                    "PSF will be calculated on more stars, but star detection\n"+
                     "will take more time."
             },
          ]
@@ -140,7 +140,7 @@ var StarUtilsUI = {
                outputLabel: true,
                onValueUpdated: 'onPSFThresholdUpdated',
                tip: "Flux threshold for PSF data extraction. With lower values,\n"+
-                    "PSF will be calculated for more stars, but star detection\n"+
+                    "PSF will be calculated on more stars, but star detection\n"+
                     "will take more time."
             },
          ]
@@ -836,6 +836,7 @@ function StatsDialog(parent) {
       if (!this.starUtils) return;
       var prop = this.chartProperty;
       var lbl = this.chartPropertyLabel || prop;
+      lbl = capitalizedString(lbl);
       var chartImages = this.charts[prop];
       if (!chartImages) chartImages = this.charts[prop] = {};
       var chartImage = chartImages.defaultChart;
@@ -1062,7 +1063,8 @@ function CalculatePSFDialog(parent) {
    ['width', 'flux'].forEach(property => {
       var box = new GroupBox(me);
       with (box) {
-         title = 'Star ' + capitalizedString(property) + ' Threshold';
+         let propName = capitalizedString(property);
+         title = 'Star ' + propName + ' Threshold';
          titleCheckBox = true;
          sizer = me.parent.createHorizontalSizer(box);
          var control = me[property + 'Threshold'] = new NumericControl(me);
@@ -1071,9 +1073,9 @@ function CalculatePSFDialog(parent) {
          control.setValue(minimums[property] / 2);
          sizer.add(control);
          control.setFixedWidth(me.font.width('MMMMMMMMMMMMMMMMMMMMM'));
-         control.toolTip = "Width threshold for PSF data extraction. " +
-           + capitalizedString(property) + " lower values,\n"+
-           "PSF will be calculated for more stars, but star detection\n"+
+         control.toolTip = propName + " threshold for PSF data extraction. " +
+           "With lower values,\n"+
+           "PSF will be calculated on more stars, but star detection\n"+
            "will take more time.";
          control.onValueUpdated = onChange;
          sizer.addStretch();
