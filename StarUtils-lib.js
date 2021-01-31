@@ -2050,7 +2050,26 @@ StarUtils.prototype = {
    },
    updateProgress: function (progress, tot) {
       if (this.onProgressUpdate) this.onProgressUpdate(this, progress, tot);
-   }
+   },
+   getHistogramPeakLevel: function (image) {
+      image = image || this.win.mainView.image;
+      let i = 0, channels = image.numberOfChannels;
+      let peakLevel = 0;
+      for (i = 0; i < channels; i++) {
+         image.selectedChannel = i;
+         h = new Histogram();
+         h.resolution = 256;
+         h.generate(image);
+         peakLevel += h.normalizedPeakLevel;
+      }
+      peakLevel /= channels;
+      image.resetChannelSelection();
+      return peakLevel;
+   },
+   isStarOnlyImage: function (image) {
+      let peakLevel = this.getHistogramPeakLevel(image);
+      return peakLevel < 0.025;
+   },
 };
 
 #endif /* __STARUTILS_LIB_JS__ */

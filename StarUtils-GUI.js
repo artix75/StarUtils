@@ -40,6 +40,10 @@
 
 #define IMAGEID_AUTO '<Auto>'
 #define MAX_PREVIEW_STARS 4
+#define IMAGE_ACTION_CANCEL   0
+#define IMAGE_ACTION_PROCEED  (1 << 0)
+#define IMAGE_ACTION_EXTRACT  (1 << 1)
+
 
 var StarUtilsUI = {
    starDetector: [
@@ -1432,6 +1436,7 @@ function StarUtilsDialog (options) {
    if (this.options.collapsablePanels === undefined)
       this.options.collapsablePanels = true;
    this.starUtils = null;
+   this.starNetSupport = (typeof(StarNet) !== 'undefined');
    this.optControls = {};
    this.imageStars = {};
    this.status = null;
@@ -1846,6 +1851,8 @@ function StarUtilsDialog (options) {
       this.settingPreviewBitmapWithID = null;
       this.previewBitmapID = null;
       this.zoomPreviewToStar = null;
+      this.starsOnlyWindow = null;
+      this.starlessWindow = null;
       var optNames = Object.keys(this.optControls);
       optNames.forEach(name => {
          var control = me.optControls[name];
@@ -1870,9 +1877,32 @@ function StarUtilsDialog (options) {
    this.startAnalysis = function () {
       var sd = this.newStarUtils();
       if (!sd) return;
+      if (!sd.isStarOnlyImage()) {
+         let res = this.nonStarOnlyImageAction();
+         if (res === IMAGE_ACTION_CANCEL) return;
+         if (res & IMAGE_ACTION_EXTRACT) this.doExtractStars = true;
+      }
       this.analyzeButton.enabled = false;
       this.enabled = false;
       try {
+         if (this.doExtractStars === true) {
+            this.originalWindow = sd.win;
+            let windows = this.extractStarsFromImage();
+            this.starsOnlyWindow = null;
+            if (windows != null) {
+               this.starlessWindow = windows.starless;
+               this.starsOnlyWindow = windows.stars;
+            }
+            if (this.starsOnlyWindow === null) {
+               me.alert("Failed to extract stars");
+               me.cancel();
+               return;
+            }
+            this.starlessWindow.bringToFront();
+            this.starsOnlyWindow.bringToFront();
+            this.viewList.currentView = this.starsOnlyWindow.mainView;
+            sd = this.newStarUtils();
+         }
          sd.analyzeStars();
          if (me.abortRequested) return;
          this.foundStarsLabel.text = '' + sd.stars.length;
@@ -1954,6 +1984,83 @@ function StarUtilsDialog (options) {
       var msgbox = new MessageBox(message, "StarUtils", StdIcon_Error,
          StdButton_Ok);
       msgbox.execute();
+   };
+
+   this.nonStarOnlyImageAction = function () {
+      var msgbox = null;
+      var msg = "Selected image doesn't seem to be a <i>star-only</i> image.";
+      var res = null;
+      if (this.starNetSupport) {
+         msg += "<ul>";
+         msg += "<li>Click 'Yes' to extract stars via StarNet</li>";
+         msg += "<li>Click 'No' to proceed anyway (unrecommended!)</li>";
+         msg += "<li>Click 'Cancel' to avoid proceeding</li>";
+         msg += '</ul>';
+         msgbox = new MessageBox(msg, "Warning", StdIcon_Warning,
+            StdButton_Yes, StdButton_No, StdButton_Cancel, 2);
+         res = msgbox.execute();
+         if (res === StdButton_Yes)
+            res = (IMAGE_ACTION_PROCEED | IMAGE_ACTION_EXTRACT);
+         else if (res === StdButton_No) res = IMAGE_ACTION_PROCEED;
+         else res = IMAGE_ACTION_CANCEL;
+      } else {
+         msg += "<br> Do you really want to proceed (unrecommended)?";
+         msgbox = new MessageBox(msg, "Warning", StdIcon_Warning,
+            StdButton_Yes, StdButton_Cancel, 1);
+         res = msgbox.execute();
+         if (res === StdButton_Yes) res = IMAGE_ACTION_PROCEED;
+         else res = IMAGE_ACTION_CANCEL;
+      }
+      return res;
+   };
+
+   this.extractStarsFromImage = function () {
+      if (!this.starNetSupport) return null;
+      if (!this.starUtils) return null;
+      let targetView = this.starUtils.win.mainView;
+      if (targetView === null) targetView  = this.viewList.currentView;
+      if (targetView === null) return null;
+      let targetViewId = targetView.id;
+      let allWindows = {};
+      ImageWindow.windows.forEach(window => {
+         if (window.isClosed || window.isNull) return;
+         let view = window.mainView;
+         if (view.isNull) return;
+         allWindows[view.fullId] = true;
+      });
+      this.onStatusUpdate('Extracting stars');
+      this.onProgressUpdate(0,0);
+      processEvents();
+      let starlessId = targetViewId + '_starless';
+      let cloned = this.starUtils.cloneCurrentWindow(starlessId, {
+            copyImage: true
+      });
+      if (cloned === null) return null;
+      targetView = cloned.mainView;
+      allWindows[targetView.fullId] = true;
+      var P = new StarNet;
+      P.stride = StarNet.prototype.Stride_128;
+      P.mask = true;
+      P.executeOn(targetView);
+      this.onStatusUpdate('Done');
+      this.onProgressUpdate(0,0);
+      processEvents();
+      let starsOnlyWindow = null;
+      ImageWindow.windows.forEach(window => {
+         if (starsOnlyWindow !== null) return;
+         if (window.isClosed || window.isNull) return;
+         let view = window.mainView;
+         if (view.isNull) return;
+         let id = view.fullId;
+         if (!allWindows[id]) starsOnlyWindow = window;
+      });
+      if (starsOnlyWindow)
+         starsOnlyWindow.mainView.id = targetViewId + '_stars';
+      else cloned.forceClose();
+      return {
+         starless: cloned,
+         stars: starsOnlyWindow
+      };
    };
 
    this.createSizer = function (type, parent) {
