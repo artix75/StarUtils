@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xri version="1.0">
+  <description>
+     <p>
+     </p>
+  </description>
+   <platform os="all" arch="noarch" version="">
+      <package fileName=""
+               sha1=""
+               type="script"
+               releaseDate="">
+         <title>
+         </title>
+         <description>
+         </description>
+      </package>
+   </platform>
+</xri>
