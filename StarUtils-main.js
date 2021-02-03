@@ -20,10 +20,10 @@
 
 #feature-id Utilities > StarUtils
 #feature-info StarUtils is a PixInsight script that can be used to analyze \
-    stars, create masks from them and, finally, to fix them.\
-    Star fixing mainly consists of two separate process that can also be \
-    selectively enabled or disabled:\
-    <b>elongation fix</b> and <b>star reduction</b>.\
+    stars, create masks from them and, finally, to fix them. \
+    Star fixing mainly consists of two separate processes that can also be \
+    selectively enabled or disabled: \
+    <b>elongation fix</b> and <b>star reduction</b>.<br>\
     \
     Copyright &copy; 2020-2025 Giuseppe Fabio Nicotra (artix2 at gmail dot com)
 

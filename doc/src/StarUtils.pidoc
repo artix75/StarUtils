@@ -15,7 +15,7 @@
 
 \introduction {
     StarUtils is a PixInsight script that can be used to analyze stars, create masks from them and, finally, to fix them.
-    Star fixing mainly consists of two separate process that can also be selectively enabled or disabled: \s {elongation fix} and \s {star reduction}.
+    Star fixing mainly consists of two separate processes that can also be selectively enabled or disabled: \s {elongation fix} and \s {star reduction}.
 
     Under the hood, StarUtils uses PixInsight's StarDetector class in order to detect stars inside the image and then it tries to find a valid \s {PSF solution} for stars matching various tunable parameters by using \xref https://pixinsight.com/doc/tools/DynamicPSF/DynamicPSF.html {DynamicPSF process}.
 

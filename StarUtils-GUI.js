@@ -2447,11 +2447,20 @@ function StarUtilsDialog (options) {
       setScaledFixedSize(20,20);
       onClick = function () {
          let scriptfile = #__FILE__;
-         let scriptdir = File.extractDirectory(scriptfile);
-         let helpfile = File.appendToName(scriptdir,
-            '/doc/PIDoc/scripts/StarUtils/StarUtils.html');
-         //console.noteln(helpfile);
-         Dialog.openBrowser('file://' + helpfile);
+         let isInstalled = scriptfile.indexOf(coreSrcDirPath) === 0;
+         if (!isInstalled) {
+             let scriptdir = File.extractDirectory(scriptfile);
+             let helpfile = File.appendToName(scriptdir,
+                '/doc/PIDoc/scripts/StarUtils/StarUtils.html');
+             if (!File.exists(helpfile)) {
+                me.alert("Could not find documentation file");
+                return;
+             }
+             Dialog.openBrowser('file://' + helpfile);
+         } else {
+             if (!Dialog.browseScriptDocumentation('StarUtils'))
+                me.alert("Documentation has not been installed");
+         }
       }
    }
    viewListSizer.add(this.viewList, 1, Align_Left);
