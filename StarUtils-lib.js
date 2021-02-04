@@ -201,6 +201,15 @@ function PSFFunctionName(func) {
    }
 }
 
+function isWindowOpen(win) {
+   return win !== undefined && win !== null && !win.isNull && !win.isClosed;
+};
+
+function isSameWindow(win1, win2) {
+   if (!isWindowOpen(win1) || !isWindowOpen(win2)) return false;
+   return win1.mainView.fullId === win2.mainView.fullId;
+}
+
 function StarUtils(opts) {
    this.initialize(opts);
 };
@@ -261,7 +270,7 @@ StarUtils.prototype = {
          this.luminanceView = lview;
          lview.window.hide();
          this.temporaryWindows.push(lview.window);
-      } else this.luminanceView = this.win.mainView;
+      } else lview = this.luminanceView = this.win.mainView;
       this.updateProgress(0,0);
       this.sd.progressCallback = function (count, tot) {
          processEvents();
@@ -2010,7 +2019,7 @@ StarUtils.prototype = {
    },
    closeTemporaryWindows: function () {
       var lwin = this.luminanceView.window;
-      if (lwin && lwin !== this.win && !lwin.isNull && !lwin.isClosed) {
+      if (isWindowOpen(lwin) && !isSameWindow(lwin, this.win)) {
             this.luminanceView.window.forceClose();
       }
       this.temporaryWindows.forEach(window => {
