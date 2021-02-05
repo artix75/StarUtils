@@ -380,6 +380,8 @@ function ProgressBar(parent, opts) {
    var me = this;
    opts = opts || {};
 
+   this.displayText = opts.displayText;
+   if (this.displayText === undefined) this.displayText = true;
    this.backgroundColor = opts.backgroundColor || 0xFFF0F0F0;
    this.scaledMinHeight = 12;
    this.textAlignment = TextAlign_HorzCenter | TextAlign_VertCenter;
@@ -561,9 +563,9 @@ function PreviewControl(parent, opts) {
 
    this.setImage = function(image, metadata) {
       this.image = image;
-      this.metadata = metadata;
+      this.metadata = metadata || {};
       this.scaledImage = null;
-      if (metadata && metadata.originalImage)
+      if (metadata.originalImage)
          this.srcImage = new Image(this.metadata.originalImage);
       this.setZoomOutLimit();
       this.updateZoom(metadata.zoom || this.zoomThatFits());
@@ -584,6 +586,8 @@ function PreviewControl(parent, opts) {
    }
 
    this.updateZoom = function (newZoom, refPoint) {
+      if (this.metadata.width === undefined ||
+          this.metadata.height === undefined) return;
       newZoom = Math.max(this.zoomOutLimit, Math.min(2, newZoom));
       if (newZoom == this.zoom && this.scaledImage) return;
       if (!refPoint) {
@@ -632,8 +636,9 @@ function PreviewControl(parent, opts) {
 
    this.zoomThatFits = function () {
       var imgW = this.metadata.width, imgH = this.metadata.height,
-      vpW = this.scrollbox.viewport.width,
-      vpH = this.scrollbox.viewport.height;
+           vpW = this.scrollbox.viewport.width,
+           vpH = this.scrollbox.viewport.height;
+      if (imgW === undefined || imgH === undefined) return this.zoom || 1;
       return Math.min(vpW / imgW, vpH / imgH);
    };
 
@@ -651,6 +656,8 @@ function PreviewControl(parent, opts) {
    }
 
    this.setZoomOutLimit = function() {
+      if (this.metadata.width === undefined ||
+          this.metadata.height === undefined) return;
       var scaleX = Math.ceil(this.metadata.width/this.scrollbox.viewport.width);
       var scaleY = Math.ceil(this.metadata.height/this.scrollbox.viewport.height);
       var scale = Math.max(scaleX,scaleY);
@@ -1414,6 +1421,8 @@ function StarUtilsDialog (options) {
    this.__base__();
    this.options = options || {};
 
+   if (this.options.collapsablePanels === undefined)
+      this.options.collapsablePanels = true;
    this.starUtils = null;
    this.optControls = {};
    this.imageStars = {};
@@ -1602,7 +1611,8 @@ function StarUtilsDialog (options) {
       stars.forEach(star => {
          var node = new TreeBoxNode();
          me.updateStarListNode(node, star);
-         for (c = 1; c < listBox.numberOfColumns; c++) {
+         let c = 1;
+         for (; c < listBox.numberOfColumns; c++) {
             node.setAlignment(c, Align_Right);
          }
          node.star = star;
@@ -1761,6 +1771,7 @@ function StarUtilsDialog (options) {
       opts = opts || {};
       var curPos = this.position, curWidth = this.width,
           curHeight = this.height;
+      if (opts.collapsePanels === undefined) opts.collapsePanels = true;
       var collapsablePanels = this.options.collapsablePanels !== false &&
                               opts.collapsePanels !== false;
       if (!this.starUtils || !this.starsDetected) {
@@ -2005,6 +2016,9 @@ function StarUtilsDialog (options) {
       var name = control.name;
       var label = control.label;
       var element = new type(me);
+      if (control.stretch === undefined) control.stretch = false;
+      if (control.enabled === undefined) control.enabled = true;
+      if (control.disabled === undefined) control.disabled = false;
       //element.setFixedWidth(editW);
       if (control.tip) element.toolTip = control.tip;
       var value = control.value || opts.value;
@@ -2089,6 +2103,7 @@ function StarUtilsDialog (options) {
       } else if (type === Edit) {
          elementSizer = me.createHorizontalSizer(sizer);
          if (label) elementSizer.add(label, 0, align);
+         if (control.readOnly === undefined) control.readOnly = false;
          element.readOnly = (control.readOnly === true);
          if (value) element.text = '' + value;
          elementSizer.add(element, 1, align);
@@ -2105,7 +2120,8 @@ function StarUtilsDialog (options) {
          if (label) element.title = label;
          if (control.checkbox) {
             element.titleCheckBox = true;
-            element.checked = control.checked !== false;
+            element.checked =
+               (control.checked === undefined || control.checked !== false);
             let onCheck = control.onCheck;
             if (typeof(onCheck) === 'string') onCheck = parentDialog[onCheck];
             if (onCheck) element.onCheck = onCheck;
@@ -2117,6 +2133,7 @@ function StarUtilsDialog (options) {
             children.forEach(child => {
                var childElem = me.createControl(child, csizer, opts);
             });
+
             if (control.stretch === true) csizer.addStretch();
          }
       } else if (type === ComboBox) {
@@ -2273,7 +2290,10 @@ function StarUtilsDialog (options) {
                var stars = previewStars || me.getSelectedStars();
                var selected = {};
                stars.forEach(star => {selected[star.id] = true});
-               filter = function (star) {return selected[star.id] === true};
+               filter = function (star) {
+                  let selectedStar = selected[star.id];
+                  return (selectedStar !== undefined && selectedStar === true);
+               };
             }
             var fixOpts = {
                threshold: threshold,

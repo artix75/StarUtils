@@ -600,7 +600,7 @@ StarUtils.prototype = {
       var tot = stars.length;
       stars.forEach((star, i) => {
          processEvents();
-         if (me.abortRequested) return recalculatedStars;
+         if (me.abortRequested) return;
          if (doUpdateProgress) me.updateProgress(i + 1, tot);
          if (star.psf && !opts.forced) return;
          if (me.shouldDetectPSF(star, psfThreshold)) {
@@ -608,6 +608,7 @@ StarUtils.prototype = {
             if (star.psf) recalculatedStars.push(star);
          }
       });
+      if (this.abortRequested) return recalculatedStars;
       this.updatePSFStats();
       if (doUpdateProgress) {
          this.setStatus("Done");
@@ -749,7 +750,7 @@ StarUtils.prototype = {
       }
       if (opts.hidden) new_win.hide();
       this.drawStars(new_win, stars, opts);
-      if (opts.show !== false) {
+      if (opts.show !== undefined && opts.show !== false) {
          new_win.show();
          new_win.bringToFront();
       }
@@ -1011,7 +1012,7 @@ StarUtils.prototype = {
    cloneWindow: function (win, suffix, opts) {
       opts = opts || {};
       var img = win.mainView.image;
-      var is_temp = (opts.temporary === true);
+      var is_temp = (opts.temporary !== undefined && opts.temporary === true);
       if (!suffix) {
          suffix = 'tmp_' + randomID();
          is_temp = true;
@@ -1087,6 +1088,7 @@ StarUtils.prototype = {
    },
    detectPSF: function (star, view, opts) {
       opts = opts || {};
+      if (opts.autoAperture === undefined) opts.autoAperture = true;
       var r = star.rect;
       var d = r.width / 2;
       r = new Rect(r.x0 - d, r.y0 - d, r.x1 + d, r.y1 + d);
@@ -1204,7 +1206,8 @@ StarUtils.prototype = {
       win = win || this.win;
       var view = win.mainView;
       var maxStdDev = opts.maxStdDev || 8;
-      var deringing = (opts.deringing !== false);
+      var deringing =
+         (opts.deringing === undefined || opts.deringing !== false);
       var deringingScale = opts.deringingScale || 1;
       var fixFactor = opts.fixFactor || 1;
       var processContainer = opts.processContainer;
@@ -1294,7 +1297,7 @@ StarUtils.prototype = {
       var threshold = opts.threshold || 0.9;
       var win = opts.win || this.win;
       var origWin = win;
-      if (opts.atomic !== false) {
+      if (opts.atomic === undefined || opts.atomic !== false) {
          win = this.cloneCurrentWindow();
          win.hide();
          win.mainView.beginProcess(UndoFlag_NoSwapFile);
@@ -1363,6 +1366,7 @@ StarUtils.prototype = {
    reduceStars: function (stars, win, opts) {
       win = win || this.win;
       opts = opts || {};
+      if (opts.selectionScale === undefined) opts.selectionScale = true;
       var selection = opts.selection || 0.25;
       if (selection > 0.45) selection = 0.45;
       var processContainer = opts.processContainer;
@@ -1690,10 +1694,12 @@ StarUtils.prototype = {
          var cbk = opts.onDraw;
          var style = {color: color, penWidth: penWidth};
          if (cbk) cbk.call(me, star, style);
+         if (style.draw === undefined) style.draw = true;
          if (style.draw === false) return;
          g.pen = new Pen(style.color, style.penWidth,
             PenStyle_Solid, PenCap_Round);
          g.drawRect(r);
+         if (style.drawPSF === undefined) style.drawPSF = true;
          if (style.drawPSF !== false && star.psf) {
             g.transformationEnabled = true;
             let w = star.psf.FWHMx, h = star.psf.FWHMy,
@@ -1718,6 +1724,7 @@ StarUtils.prototype = {
             g.resetTransformation();
             g.popState();
          }
+         if (style.drawText === undefined) style.drawText = true;
          if (style.drawText !== false) {
             var txt = style.text || star.id;
             var txt_at = new Point(r.x0, r.bottom + 15);
