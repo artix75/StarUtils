@@ -2025,7 +2025,7 @@ StarUtils.prototype = {
          created: created, errorCode: err, exitCode: code};
    },
    closeTemporaryWindows: function () {
-      var lwin = this.luminanceView.window;
+      var lwin = (this.luminanceView ? this.luminanceView.window : null);
       if (isWindowOpen(lwin) && !isSameWindow(lwin, this.win)) {
             this.luminanceView.window.forceClose();
       }
