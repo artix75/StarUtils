@@ -2057,7 +2057,7 @@ StarUtils.prototype = {
       let peakLevel = 0;
       for (i = 0; i < channels; i++) {
          image.selectedChannel = i;
-         h = new Histogram();
+         let h = new Histogram();
          h.resolution = 256;
          h.generate(image);
          peakLevel += h.normalizedPeakLevel;

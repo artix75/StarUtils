@@ -1835,6 +1835,8 @@ function StarUtilsDialog (options) {
          }
       }
       if (this.fixMergeStarnetImage !== undefined) {
+         if (this.starsOnlyWindow === undefined) this.starsOnlyWindow = null;
+         if (this.starlessWindow === undefined) this.starlessWindow = null;
          let starnetMode = (
             isWindowOpen(this.starsOnlyWindow) &&
             isWindowOpen(this.starlessWindow)
