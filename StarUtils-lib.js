@@ -716,10 +716,10 @@ StarUtils.prototype = {
          }
          var side = star.width;
          side *= enlargementFactor;
-         left = star.pos.x - (side / 2);
-         top = star.pos.y - (side / 2);
-         right = left + side;
-         bottom = top + side;
+         let left = star.pos.x - (side / 2);
+         let top = star.pos.y - (side / 2);
+         let right = left + side;
+         let bottom = top + side;
          star.enlargedRect = new Rect(left, top, right, bottom);
          if (do_get_psf) {
             me.getStarPSFData(star);

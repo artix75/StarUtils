@@ -1619,7 +1619,7 @@ function StarUtilsDialog (options) {
          star.node = node;
          listBox.add(node);
       });
-      for (c = 0; c < listBox.numberOfColumns; c++) {
+      for (let c = 0; c < listBox.numberOfColumns; c++) {
          listBox.adjustColumnWidthToContents(c);
       }
    };
@@ -2432,7 +2432,7 @@ function StarUtilsDialog (options) {
    var viewId =
       (!this.viewList.currentView.isNull ? this.viewList.currentView.id : null);
    viewId = viewId || '------------';
-   viewId += 'MMMMMMMMM';
+   viewId += 'MMMMMMM';
    this.viewList.setFixedWidth(this.font.width(viewId));
    this.viewList.onViewSelected = function (v) {
       me.updateUI();
