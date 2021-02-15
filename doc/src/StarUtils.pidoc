@@ -175,4 +175,15 @@
 
 }
 
+\section {Contributing} {
+   StarUtils is open-source and it's released under the terms GPL-3.0 license.
+   You can find StarUtils source code at \xref https://github.com/artix75/StarUtils {https://github.com/artix75/StarUtils}.
+
+   Feel free to contribute to the project by reporting issues and/or submitting pull requests.
+
+
+   Please note that by contributing to the project in any form, you agree to release your code under the terms of the aforementioned GPL-3.0 license.
+   You can find the complete license text in the \s README file provided with the source code itself.
+}
+
 \make
