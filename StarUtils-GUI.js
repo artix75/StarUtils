@@ -249,6 +249,15 @@ var StarUtilsUI = {
               "applied to fix stars",
       },*/
       {
+         label: 'Merge stars and starless images',
+         propertyName: 'fixMergeStarnetImage',
+         type: CheckBox,
+         checked: false,
+         hidden: true,
+         //onCheck: 'onStarnetMergeChange',
+         tip: "After fixing star-only image, merge it with starless image"
+      },
+      {
          label: 'Replace current image',
          propertyName: 'fixReplaceCurrentImage',
          type: RadioButton,
@@ -1825,6 +1834,14 @@ function StarUtilsDialog (options) {
             this.createMaskButton.show();
          }
       }
+      if (this.fixMergeStarnetImage !== undefined) {
+         let starnetMode = (
+            isWindowOpen(this.starsOnlyWindow) &&
+            isWindowOpen(this.starlessWindow)
+         );
+         if (starnetMode) this.showControl(this.fixMergeStarnetImage);
+         else this.hideControl(this.fixMergeStarnetImage);
+      }
       this.updateSelectedStarsLabel();
       this.updatePSFStarsLabel();
       this.adjustToContents();
@@ -1902,6 +1919,7 @@ function StarUtilsDialog (options) {
             this.starsOnlyWindow.bringToFront();
             this.viewList.currentView = this.starsOnlyWindow.mainView;
             sd = this.newStarUtils();
+            this.updateUI();
          }
          sd.analyzeStars();
          if (me.abortRequested) return;
@@ -2131,9 +2149,11 @@ function StarUtilsDialog (options) {
       var name = control.name;
       var label = control.label;
       var element = new type(me);
+      element.relatedControls = [];
       if (control.stretch === undefined) control.stretch = false;
       if (control.enabled === undefined) control.enabled = true;
       if (control.disabled === undefined) control.disabled = false;
+      if (control.hidden === undefined) control.hidden = false;
       //element.setFixedWidth(editW);
       if (control.tip) element.toolTip = control.tip;
       var value = control.value || opts.value;
@@ -2145,9 +2165,11 @@ function StarUtilsDialog (options) {
       var isButton = (type === PushButton);
       var isCheckbox = (type === CheckBox);
       var isRadio = (type === RadioButton);
+      var labelControl = null;
       if (!isGroupBox && !isButton && label) {
          var txt = label;
          label = new Label(element);
+         labelControl = label;
          label.text = txt;
          if (!isCheckbox && !isRadio) label.text += ':';
          var lblAlign = (isCheckbox ? TextAlign_Left : TextAlign_Right);
@@ -2191,6 +2213,7 @@ function StarUtilsDialog (options) {
             };
             elementSizer.addUnscaledSpacing(oneCharW);
             var outputLabel = new Label(element);
+            element.relatedControls.push(outputLabel);
             value = value || 0;
             updateText(value);
             var outputWidth = 0, maxVal = 0;
@@ -2295,8 +2318,30 @@ function StarUtilsDialog (options) {
          }
       }
       if (control.propertyName) parentDialog[control.propertyName] = element;
+      if (labelControl) element.relatedControls.push(labelControl);
+      if (control.hidden === true) this.hideControl(element);
       return element;
    };
+
+   this.setControlVisibility = function (control, visible) {
+      if (typeof(control) === 'string') control = this[control];
+      if (!control) return;
+      let relatedControls = control.relatedControls || [];
+      if (visible) control.show();
+      else control.hide();
+      relatedControls.forEach(c => {
+         if (visible) c.show();
+         else c.hide();
+      });
+   };
+
+   this.showControl = function (control) {
+      this.setControlVisibility(control, true);
+   }
+
+   this.hideControl = function (control) {
+      this.setControlVisibility(control, false);
+   }
 
    this.getStatsDialog = function () {
       var sd = this.starUtils;
@@ -2451,6 +2496,24 @@ function StarUtilsDialog (options) {
             }
             me.enabled = true;
             return;
+         }
+
+         let starnetMode = (
+            isWindowOpen(this.starsOnlyWindow) &&
+            isWindowOpen(this.starlessWindow)
+         );
+         if (starnetMode && this.fixMergeStarnetImage.checked) {
+            let fixedWin = this.destWin || sd.win;
+            this.mergedWindow = sd.cloneWindow(this.starlessWindow,'merged', {
+               copyImage: true
+            });
+            this.mergedWindow.mainView.beginProcess(UndoFlag_NoSwapFile);
+            this.mergedWindow.mainView.image.apply(
+               fixedWin.mainView.image,
+               ImageOp_Add
+            );
+            this.mergedWindow.mainView.endProcess();
+            this.mergedWindow.bringToFront();
          }
 
          var question = "Star fixing completed. Do you want to rescan image?";
