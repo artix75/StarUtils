@@ -1868,6 +1868,7 @@ function StarUtilsDialog (options) {
       this.enabled = false;
       this.deleteStarUtils();
       this.settingPreviewBitmapWithID = null;
+      this.doExtractStars = false;
       this.previewBitmapID = null;
       this.zoomPreviewToStar = null;
       this.starsOnlyWindow = null;
