@@ -525,6 +525,7 @@ function PreviewControl(parent, opts) {
             btn.checked = btnDef.checked === true;
          }
          btn.enabled = btnDef.enabled !== false;
+         if (btnDef.hidden) btn.hide();
          buttonsToAdd.push(btn);
       });
    }
@@ -1453,6 +1454,7 @@ function StarUtilsDialog (options) {
    this.abortRequested = false;
    this.createNewImage = false;
    this.previewFix = false;
+   this.previewUseOriginalImage = false;
    var me = this;
 
    this.onClose = function (retval) {
@@ -1671,9 +1673,11 @@ function StarUtilsDialog (options) {
       return this.starListBox.selectedNodes.map(node => node.star);
    };
 
-   this.getBitmapID = function (stars) {
+   this.getBitmapID = function (stars, prefix) {
       stars = stars || [];
-      return stars.map(s => s.id).sort().join();
+      let id = stars.map(s => s.id).sort().join();
+      if (prefix) id = prefix + id;
+      return id;
    }
 
    this.previewSetImageWithNoMarks = function (opts) {
@@ -1697,16 +1701,34 @@ function StarUtilsDialog (options) {
    this.setPreviewImage = function (stars, opts) {
       if (!this.starUtils) return;
       opts = opts || {};
+      var useOriginalImage = false;
+      var prefix = null;
+      if (this.previewUseOriginalImage) {
+         let starnetMode = this.isStarnetMode();
+         useOriginalImage = starnetMode;
+         if (useOriginalImage && !this.originalImage) {
+            if (this.originalWindow === undefined) this.originalWindow = null;
+            useOriginalImage = isWindowOpen(this.originalWindow);
+            if (useOriginalImage) prefix = 'original';
+            else this.alert('Missing original image');
+         }
+      }
       stars = stars || [];
-      var bmpID = opts.bitmapID || this.getBitmapID(stars);
+      var bmpID = opts.bitmapID;
+      if (bmpID === undefined || !bmpID)
+         bmpID = this.getBitmapID(stars, prefix);
+      else if (prefix && !bmpID.startsWith(prefix)) bmpID = prefix + bmpID;
       if (bmpID === this.previewBitmapID) return;
       this.settingPreviewBitmapWithID = bmpID;
       this.bitmaps = this.bitmaps || {}; /* Bitmaps cache */
       var imageBmp = this.bitmaps[bmpID];
       if (!imageBmp) {
+         let win = null;
+         if (useOriginalImage) win = this.originalWindow;
          imageBmp = this.starUtils.createAnnotatedWindow(stars, {
             color: opts.color,
-            returnBitmap: true
+            returnBitmap: true,
+            win: win,
          });
          this.bitmaps[bmpID] = imageBmp;
       }
@@ -1726,7 +1748,7 @@ function StarUtilsDialog (options) {
       this.previewBitmapID = bmpID;
       this.zoomPreviewToStar = null;
       var toggleBtn = this.previewControl.toggleDetectedStarsBtn;
-      if (toggleBtn && bmpID !== 'detectedStars' && toggleBtn.checked)
+      if (toggleBtn && !bmpID.endsWith('detectedStars') && toggleBtn.checked)
          toggleBtn.checked = false;
    }
 
@@ -1789,6 +1811,15 @@ function StarUtilsDialog (options) {
          me.starListBox.selectedNodes.length);
    };
 
+   this.isStarnetMode = function () {
+      if (this.starsOnlyWindow === undefined) this.starsOnlyWindow = null;
+      if (this.starlessWindow === undefined) this.starlessWindow = null;
+      return (
+         isWindowOpen(this.starsOnlyWindow) &&
+         isWindowOpen(this.starlessWindow)
+      );
+   };
+
    this.updateUI = function (opts) {
       opts = opts || {};
       var curPos = this.position, curWidth = this.width,
@@ -1835,13 +1866,7 @@ function StarUtilsDialog (options) {
          }
       }
       if (this.fixMergeStarnetImage !== undefined) {
-         if (this.starsOnlyWindow === undefined) this.starsOnlyWindow = null;
-         if (this.starlessWindow === undefined) this.starlessWindow = null;
-         let starnetMode = (
-            isWindowOpen(this.starsOnlyWindow) &&
-            isWindowOpen(this.starlessWindow)
-         );
-         if (starnetMode) this.showControl(this.fixMergeStarnetImage);
+         if (this.isStarnetMode()) this.showControl(this.fixMergeStarnetImage);
          else this.hideControl(this.fixMergeStarnetImage);
       }
       this.updateSelectedStarsLabel();
@@ -1891,6 +1916,11 @@ function StarUtilsDialog (options) {
          checked = false;
          enabled = false;
       }
+      with (this.previewControl.toggleOriginalImageBtn) {
+         checked = false;
+         enabled = false;
+         hide();
+      }
       this.previewControl.clearSelectedStarsBtn.enabled = false;
    };
 
@@ -1922,6 +1952,11 @@ function StarUtilsDialog (options) {
             this.starsOnlyWindow.bringToFront();
             this.viewList.currentView = this.starsOnlyWindow.mainView;
             sd = this.newStarUtils();
+            with (this.previewControl.toggleOriginalImageBtn) {
+               checked = false;
+               enabled = true;
+               show();
+            }
             this.updateUI();
          }
          sd.analyzeStars();
@@ -2501,10 +2536,7 @@ function StarUtilsDialog (options) {
             return;
          }
 
-         let starnetMode = (
-            isWindowOpen(this.starsOnlyWindow) &&
-            isWindowOpen(this.starlessWindow)
-         );
+         let starnetMode = this.isStarnetMode();
          if (starnetMode && this.fixMergeStarnetImage.checked) {
             let fixedWin = this.destWin || sd.win;
             this.mergedWindow = sd.cloneWindow(this.starlessWindow,'merged', {
@@ -2796,7 +2828,7 @@ function StarUtilsDialog (options) {
                           me.previewControl.zoomThatFits;
                if (this.checked) {
                   var bmpID = me.previewBitmapID;
-                  if (bmpID === 'detectedStars') return;
+                  if (bmpID.endsWith('detectedStars')) return;
                   if (bmpID) this.oldPreviewBitmapID = bmpID;
                   me.previewDisplayDetectedStars({zoom: zoom});
                } else {
@@ -2820,7 +2852,32 @@ function StarUtilsDialog (options) {
                me.updateSelectedStarsLabel();
                me.previewSetImageWithNoMarks({zoom: zoom});
             }
-         }
+         },
+         {
+            name: 'toggleOriginalImageBtn',
+            icon: ':/icons/picture.png',
+            tooltip: 'User original image',
+            enabled: false,
+            checkable: true,
+            checked: false,
+            hidden: true,
+            onClick: function () {
+               var zoom = me.previewControl.zoom ||
+                          me.previewControl.zoomThatFits;
+               me.previewUseOriginalImage = this.checked;
+               var bmpID = me.previewBitmapID;
+               if (bmpID.endsWith('detectedStars'))
+                  me.previewDisplayDetectedStars({zoom: zoom});
+               else {
+                  if (me.starListBox.selectedNodes.length === 0)
+                     me.previewSetImageWithNoMarks({zoom: zoom});
+                  else {
+                     var stars = me.getSelectedStars();
+                     me.setPreviewImage(stars, {zoom: zoom});
+                  }
+               }
+            }
+         },
       ]
    });
    this.previewControl.onCustomMouseClick = function (x, y, state, mod) {
