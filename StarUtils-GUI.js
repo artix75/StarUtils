@@ -44,6 +44,8 @@
 #define IMAGE_ACTION_PROCEED  (1 << 0)
 #define IMAGE_ACTION_EXTRACT  (1 << 1)
 
+/* #define SHOW_STARONLY_IMAGE_TIP 1 */
+
 
 var StarUtilsUI = {
    starDetector: [
@@ -1896,6 +1898,7 @@ function StarUtilsDialog (options) {
       this.doExtractStars = false;
       this.previewBitmapID = null;
       this.zoomPreviewToStar = null;
+      this.originalWindow = null;
       this.starsOnlyWindow = null;
       this.starlessWindow = null;
       var optNames = Object.keys(this.optControls);
@@ -2627,6 +2630,7 @@ function StarUtilsDialog (options) {
       wordWrapping = false;
       setFixedWidth(me.calculateLabelFixedWidth(label) + oneCharW);
    }
+#ifdef SHOW_STARONLY_IMAGE_TIP
    var tipLabel = new Label(this);
    with (tipLabel) {
       text = "<i><b>Tip:</b> use a star-only image</i>";
@@ -2637,6 +2641,7 @@ function StarUtilsDialog (options) {
       useRichText = true;
       setFixedWidth(labelW + (oneCharW * 2));
    }
+#endif
    viewListSizer.add(label, 0, Align_Left);
    this.viewList = new ViewList(this);
    this.viewList.getMainViews();
@@ -2697,7 +2702,9 @@ function StarUtilsDialog (options) {
       }
    }
    viewListSizer.add(this.viewList, 1, Align_Left);
+#ifdef SHOW_STARONLY_IMAGE_TIP
    viewListSizer.add(tipLabel, 1, Align_Left);
+#endif
    viewListSizer.add(this.targetAreaCheckBox, 1, Align_Left);
    viewListSizer.addStretch();
    viewListSizer.add(this.helpButton, 1, Align_Right);
