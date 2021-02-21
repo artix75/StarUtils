@@ -26,7 +26,26 @@
 }
 
 \section { Target Image } {
-    \s {IMPORTANT: }  it's recommended to use the script on \e {star-only} images, in order to obtain better results. It's strongly suggested to use the \s {StarNet} PixInsight's process in order to separate the stars from the source image.
+   \s {IMPORTANT: }  it's recommended to use the script on images \s {containing only stars}, in order to obtain better results.
+   StarUtils is able to extract stars by itself by using PixInsight's \s {StarNet} process.\n
+   If StarUtils finds out that your image contains subjects other than stars (ie. nebulas, galaxies, and so on),
+   it will warn you about it and it will propose you three choices:
+
+   \figure[numbered:non_staronly_warn_dialog,width:50\%] {
+      \image[width:100\%] ../images/starutils-image-warn-dialog.png
+      \figtag {Warning dialog about images containing subjects other than stars.}
+   }
+
+   You can choose what to do by click one of the warning dialog buttons.
+
+   \list {
+      {\s {"Yes"} button: This action will extract stars from the original image and it will create a new image containing \e {only stars} along with a \e starless image.\n
+       The original image will remain untouched and processing will be only applied on the new image containing \e {only stars}.\n
+       Later, you'll be able to merge the processed image with the starless image.}
+      {\s {"No"} button: Keep using your selected image even if it could contain other DSO subjects.}
+      {\s {"Cancel"} button: Cancel image analysis in order to select another image.}
+   }
+
 }
 
 \section { Using StarUtils } {
@@ -94,6 +113,23 @@
         The preview image will display the target image. All detected stars will be marked by a blue box. You can toggle those marks by using the appopriate toggler button above the preview itself.
         Selected stars will be marked by a green box. You can select/deselect stars either by clicking on them in the star list or on the preview image itself.
         Inside every marking box you'll also find a PSF ellipse for those stars having a PSF solution. The ellipse will visually display the aspect ratio (elongation) and the angle of the star. A crosshair will also display PSF center.
+
+        If you've extracted stars from the original target image that contained subjects other than stars (see figure \figref non_staronly_warn_dialog), you'll be able to toggle the image to show in the preview between the original target image and the current image containing only stars.
+
+         Here's the preview image toolbar
+
+         \figure[width:30\%] {
+            \image[width:100\%] ../images/starutils-preview-toolbar.png
+            \figtag {The preview image toolbar.}
+         }
+
+         \table[caption,unnumbered] {
+            {Preview Image toolbar buttons.}
+            {{\image ../images/starutils-toggle-detected-btn.png} {Toggle between detected stars and selected stars view.}}
+            {{\image ../images/starutils-deselect-all-btn.png} {Deselect all selected stars}}
+            {{\image ../images/starutils-toggle-original-btn.png} {In case you've extracted stars from the original target image, (see \figref non_staronly_warn_dialog), toggle between original image and image containing only extracted stars.}}
+         }
+
     }
 
     \subsection {Visualizing statistics} {
@@ -146,19 +182,38 @@
             You can choose the amount of reduction by tuning the \e {Morphological Selection} slider inside the box.
          }
 
+         \subsection {Preview Fixes} {
+            You can have a preview of the eventual fixes before applying the by selecting a maximum of 4 stars by enabling the relative \lref {preview_fix_opt} {option}.\n
+
+            \figure[numbered:preview_fixes,width:50\%] {
+               \image[width:100\%] ../images/starutils-dialog-detection-fix-preview.png
+               \figtag {Using \s {Preview on selected stars} mode.}
+            }
+
+            When the \s {"Preview on selected stars"} mode is enabled, no fix will be actuallty applied on the image and you will only see a preview window displaying effects of the fix process on the selected stars.
+         }
+
          \subsection {Fix Options} {
             \table[caption,unnumbered] {
                {Fix Options}
                {{\s {Replace current image}} {Apply fixes un current selected image.}}
-               {{\s {Preview on selected stars}} {Just preview fixes on (max. 4) selected stars (do not apply fixes at all).}}
+               {{\s {\label {preview_fix_opt} Preview on selected stars}} {Just preview fixes on (max. 4) selected stars (do not apply fixes at all). See figure \figref preview_fixes}}
                {{\s {Create new image}} {Apply fixes on a new image that's a clone of the current selected image.}}
                {{\s {Image Id}} {If \s {Create new image} is enabled, this field allows you to specify the new image ID (leave it empty or <Auto> in order to give it an automatic Id).}}
             }
 
-            \figure[width:50\%] {
-               \image[width:100\%] ../images/starutils-dialog-detection-fix-preview.png
-               \figtag {Using \s {Preview on selected stars} mode.}
+            An additional option will be available in case you've extracted stars (see \figref non_staronly_warn_dialog) from the original target image that contained subjects other than stars.\n
+            See figure below:
+
+            \figure[width:30\%] {
+               \image[width:100\%] ../images/starutils-merge-original.png
+               \figtag {
+                  If you activate this option, StarUtils will merge the image containing only extracted stars with a starless image of the same subject after applying fixes to the former.\n
+                  Leave it unchecked to only apply fixes to the image containing only extracted stars.
+               }
+
             }
+
          }
 
          \subsection {Examples} {
