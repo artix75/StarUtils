@@ -1540,6 +1540,8 @@ StarUtils.prototype = {
    },
    convolution: function (view, stdDev, opts) {
       opts = opts || {};
+      if (stdDev < 0.1) stdDev = 0.1;
+      else if (stdDev > 250) stdDev = 250;
       var shape = opts.shape;
       var ratio = opts.ratio;
       var processContainer = opts.processContainer;
