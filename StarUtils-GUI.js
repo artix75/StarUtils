@@ -92,6 +92,14 @@ var StarUtilsUI = {
              'less accurate.'
       },
       {
+         label: 'Minimum Flux',
+         name: 'minimumFlux',
+         type: NumericControl,
+         value: 3.5,
+         range: [0.1, 10.0],
+         tip: 'Minimum flux for stars to be detected. Lower values may include stars that could be too faint to be even visible.'
+      },
+      {
          label: 'Structure Layers',
          name: 'structureLayers',
          type: SpinBox,

@@ -223,6 +223,7 @@ StarUtils.prototype = {
     *  - maxDistortion: StarDetector maxDistortion
     *  - structureLayers : StarDetector structureLayers
     *  - xyStretch: xStarDetector yStretch
+    *  - minimumFlux: Minimum flux for stars to be detected
     *  - window: Image window to analyze/fix
     *  - sizeClassInterval: interval of size classes (default 10)
     *  - targetArea: Area of the image to be scanned, can be a Rect or a
@@ -246,6 +247,7 @@ StarUtils.prototype = {
       if (opts.maxDistortion) sd.maxDistortion = opts.maxDistortion;
       if (opts.structureLayers) sd.structureLayers = opts.structureLayers;
       if (opts.xyStretch) sd.xyStretch = opts.xyStretch;
+      if (opts.minimumFlux) this.minimumFlux = opts.minimumFlux;
       this.onStatusUpdate = opts.onStatusUpdate;
       this.onProgressUpdate = opts.onProgressUpdate;
 
@@ -280,13 +282,19 @@ StarUtils.prototype = {
       }
       var stars = this.sd.stars(lview.image);
       var targetArea = this.opts.targetArea;
+      var minFlux = this.minimumFlux;
       if (targetArea) {
          if (targetArea instanceof View && targetArea.isPreview)
             targetArea = targetArea.window.previewRect(targetArea);
          this.log.targetArea = rectToObj(targetArea);
          this.targetArea = targetArea;
          stars = stars.filter(function (star) {
+            if (minFlux && star.flux < minFlux) return false;
             return targetArea.includes(star.pos.x, star.pos.y);
+         });
+      } else if (minFlux) {
+         stars = stars.filter(function (star) {
+            return (star.flux >= minFlux);
          });
       }
       this.stars = stars;

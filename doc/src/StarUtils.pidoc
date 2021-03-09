@@ -50,6 +50,7 @@
             {{\s {Upper Peak Limit}} {Stars with peak values greater than this value won't be detected.}}
             {{\s {Max Distortion}} {Maximum distortion allowed, relative to a perfect square. The distortion of a perfect circle is pi/4.}}
             {{\s {XY Stretch}} {Stretch factor for the barycenter search algorithm, in sigma units. Increase it to make the algorithm more robust to nearby structures.}}
+            {{\s {Minimum Flux}} {Minimum flux for stars to be detected. Lower values may include stars that could be too faint to be even visible.}}
             {{\s {Structure Layers}} {Number of wavelet layers for structure detection.}}
          }
 
